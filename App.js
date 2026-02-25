@@ -12,6 +12,8 @@ import {
 } from '@expo-google-fonts/albert-sans';
 import { useOnboardingStore } from './stores/useOnboardingStore';
 import { useAuthStore } from './stores/useAuthStore';
+import { useExchangeRatesStore } from './stores/useExchangeRatesStore';
+import { useAssistantStore } from './stores/useAssistantStore';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { mapSupabaseUserToStore } from './lib/authSync';
 import AppNavigator from './navigation/AppNavigator';
@@ -35,7 +37,10 @@ export default function App() {
         await Promise.all([
           useOnboardingStore.persist.rehydrate(),
           useAuthStore.persist.rehydrate(),
+          useExchangeRatesStore.persist.rehydrate(),
+          useAssistantStore.persist.rehydrate(),
         ]);
+        useExchangeRatesStore.getState().fetchRates();
         useOnboardingStore.getState().resetOnboarding();
 
         // Supabase session bo‘lsa store ni user_metadata (avatar_url, full_name) bilan yangilash

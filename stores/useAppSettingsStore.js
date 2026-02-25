@@ -7,6 +7,8 @@ export const useAppSettingsStore = create(
     (set) => ({
       vibration: true,
       setVibration: (vibration) => set({ vibration }),
+      preferredCurrency: 'USD',
+      setPreferredCurrency: (preferredCurrency) => set({ preferredCurrency }),
     }),
     {
       name: 'antique-app-settings',

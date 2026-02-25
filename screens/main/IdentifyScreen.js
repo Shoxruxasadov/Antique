@@ -96,7 +96,7 @@ export default function IdentifyScreen({ navigation }) {
   const [notAntiqueReason, setNotAntiqueReason] = useState(null);
   const [scanningDots, setScanningDots] = useState(0);
 
-  const step1TranslateY = useRef(new Animated.Value(10)).current;
+  const step1TranslateY = useRef(new Animated.Value(0)).current;
   const step2TranslateY = useRef(new Animated.Value(12)).current;
   const step3TranslateY = useRef(new Animated.Value(12)).current;
   const step2Opacity = useRef(new Animated.Value(0)).current;
@@ -149,13 +149,8 @@ export default function IdentifyScreen({ navigation }) {
   }, [showScanModal]);
 
   useEffect(() => {
-    if (!showScanModal || notAntique || scanError) return;
-    step1TranslateY.setValue(10);
-    Animated.timing(step1TranslateY, {
-      toValue: 0,
-      duration: 320,
-      useNativeDriver: true,
-    }).start();
+    if (!showScanModal) return;
+    step1TranslateY.setValue(0);
   }, [showScanModal]);
 
   useEffect(() => {

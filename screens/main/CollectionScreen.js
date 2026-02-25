@@ -25,6 +25,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
+import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
+import { formatPriceRangeUsd } from '../../lib/currency';
 
 const THUMB_GAP = 7;
 const THUMB_COUNT = 2;
@@ -88,6 +91,10 @@ export default function CollectionScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const user = useAuthStore((s) => s.user);
+  const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
+  const rates = useExchangeRatesStore((s) => s.rates);
+  const displayCurrency = !rates && preferredCurrency !== 'USD' ? 'USD' : preferredCurrency;
+  const rate = displayCurrency === 'USD' ? 1 : (rates?.[displayCurrency] ?? 1);
   const mainStack = navigation.getParent();
   const [activeTab, setActiveTab] = useState('details');
   const [collections, setCollections] = useState([]);
@@ -111,6 +118,9 @@ export default function CollectionScreen({ navigation }) {
   const tabWidth = (tabBarInnerWidth - tabGap) / 2;
   const indicatorLeft = useRef(new Animated.Value(0)).current;
   const returnedFromChildRef = useRef(false);
+  const prevUserIdRef = useRef(user?.id);
+
+  const FETCH_TIMEOUT_MS = 20000;
 
   const fetchCollectionsAndHistory = useCallback(async () => {
     const userId = user?.id;
@@ -119,9 +129,14 @@ export default function CollectionScreen({ navigation }) {
       setCollections([]);
       setSnapHistory([]);
       setAntiqueImageMap({});
+      setLoading(false);
       return;
     }
     setLoading(true);
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setFetchError('Yuklash vaqti tugadi. Qayta urinib ko‘ring.');
+    }, FETCH_TIMEOUT_MS);
     try {
       const [collRes, snapRes] = await Promise.all([
         supabase
@@ -174,9 +189,18 @@ export default function CollectionScreen({ navigation }) {
       setSnapHistory([]);
       setAntiqueImageMap({});
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    const hadUser = prevUserIdRef.current;
+    prevUserIdRef.current = user?.id;
+    if (!hadUser && user?.id && isSupabaseConfigured() && supabase) {
+      fetchCollectionsAndHistory();
+    }
+  }, [user?.id, fetchCollectionsAndHistory]);
 
   const getCollectionThumbnails = useCallback(
     (coll) => {
@@ -392,28 +416,12 @@ export default function CollectionScreen({ navigation }) {
           { paddingTop: 20, paddingBottom: insets.bottom + 100 },
         ]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={fetchCollectionsAndHistory}
-            colors={[colors.brand]}
-            tintColor={colors.brand}
-          />
-        }
       >
         {activeTab === 'details' ? (
           loading && collections.length === 0 ? (
-            <Animated.View
-              style={[
-                styles.loadingWrap,
-                {
-                  opacity: cardAnims[2].opacity,
-                  transform: [{ translateY: cardAnims[2].translateY }],
-                },
-              ]}
-            >
+            <View style={styles.loadingWrap}>
               <ActivityIndicator size="large" color={colors.brand} />
-            </Animated.View>
+            </View>
           ) : collections.length > 0 ? (
             <View style={[styles.cardsRow, { flexWrap: 'wrap' }]}>
               {collections.map((coll, idx) => (
@@ -460,17 +468,9 @@ export default function CollectionScreen({ navigation }) {
         ) : (
           <>
             {loading && snapHistory.length === 0 ? (
-              <Animated.View
-                style={[
-                  styles.loadingWrap,
-                  {
-                    opacity: cardAnims[2].opacity,
-                    transform: [{ translateY: cardAnims[2].translateY }],
-                  },
-                ]}
-              >
+              <View style={styles.loadingWrap}>
                 <ActivityIndicator size="large" color={colors.brand} />
-              </Animated.View>
+              </View>
             ) : snapHistory.length === 0 ? (
               <Animated.View
                 style={[
@@ -493,7 +493,7 @@ export default function CollectionScreen({ navigation }) {
                 const category = Array.isArray(snap.payload?.category)?.[0] || snap.payload?.category || 'Antique';
                 const min = snap.payload?.market_value_min;
                 const max = snap.payload?.market_value_max;
-                const priceStr = min != null && max != null ? `$${min} - $${max}` : '';
+                const priceStr = min != null && max != null ? formatPriceRangeUsd(min, max, displayCurrency, rate) : '';
                 return (
                   <Pressable
                     key={snap.id}

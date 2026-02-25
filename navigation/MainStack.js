@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MainTabs from './MainTabs';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import AppSettingsScreen from '../screens/settings/AppSettingsScreen';
+import PreferredCurrencyScreen from '../screens/settings/PreferredCurrencyScreen';
 import CreateSpaceScreen from '../screens/main/CreateSpaceScreen';
 import IdentifyScreen from '../screens/main/IdentifyScreen';
 import SnapTipsScreen from '../screens/main/SnapTipsScreen';
@@ -24,6 +25,7 @@ export default function MainStack() {
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="AppSettings" component={AppSettingsScreen} />
+      <Stack.Screen name="PreferredCurrency" component={PreferredCurrencyScreen} />
       <Stack.Screen name="CreateSpace" component={CreateSpaceScreen} />
       <Stack.Screen name="Identify" component={IdentifyScreen} />
       <Stack.Screen name="SnapTips" component={SnapTipsScreen} />

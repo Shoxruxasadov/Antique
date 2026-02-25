@@ -21,10 +21,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
+import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
+import { formatPriceRangeUsd } from '../../lib/currency';
 
 export default function CollectionDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
+  const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
+  const rates = useExchangeRatesStore((s) => s.rates);
+  const displayCurrency = !rates && preferredCurrency !== 'USD' ? 'USD' : preferredCurrency;
+  const rate = displayCurrency === 'USD' ? 1 : (rates?.[displayCurrency] ?? 1);
   const { collectionId, collectionName, antiquesIds } = route.params || {};
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -377,7 +384,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
             const category = Array.isArray(item.category)?.[0] || item.category || 'Antique';
             const priceStr =
               item.market_value_min != null && item.market_value_max != null
-                ? `$${item.market_value_min} - $${item.market_value_max}`
+                ? formatPriceRangeUsd(item.market_value_min, item.market_value_max, displayCurrency, rate)
                 : '';
             return (
               <Pressable

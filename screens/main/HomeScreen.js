@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts } from '../../theme';
+import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 
 const QUICK_ACTIONS = [
   {
@@ -57,6 +58,7 @@ function createCardAnims() {
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
   const cardGap = 12;
   const cardWidth = (width - 32 - cardGap) / 2;
   const cardAnims = useRef(createCardAnims()).current;
@@ -104,7 +106,7 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.currencyBlock}>
               <Text style={styles.currencyFlag}>🇺🇸</Text>
               <View>
-                <Text style={styles.currencyCode}>USD</Text>
+                <Text style={styles.currencyCode}>{preferredCurrency}</Text>
                 <Text style={styles.currencyLabel}>Preferred Currency</Text>
               </View>
             </View>

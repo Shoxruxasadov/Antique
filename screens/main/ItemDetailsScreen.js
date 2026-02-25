@@ -21,6 +21,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
+import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
+import { formatPrice as formatPriceWithCurrency, formatPriceRangeUsd } from '../../lib/currency';
 
 const TAB_NAMES = ['details', 'condition', 'history'];
 
@@ -84,6 +87,10 @@ export default function ItemDetailsScreen({ route, navigation }) {
   const { width } = useWindowDimensions();
   const { antiqueId, antique: antiqueParam, fromScan, fromHistory, fromCollectionAntiquesIds } = route.params || {};
   const user = useAuthStore((s) => s.user);
+  const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
+  const rates = useExchangeRatesStore((s) => s.rates);
+  const displayCurrency = !rates && preferredCurrency !== 'USD' ? 'USD' : preferredCurrency;
+  const rate = displayCurrency === 'USD' ? 1 : (rates?.[displayCurrency] ?? 1);
   const [antique, setAntique] = useState(antiqueParam || null);
   const [loading, setLoading] = useState(!antiqueParam && !!antiqueId);
   const [activeTab, setActiveTab] = useState('condition');
@@ -125,24 +132,26 @@ export default function ItemDetailsScreen({ route, navigation }) {
     })();
   }, [antiqueId, antiqueParam]);
 
-  useEffect(() => {
+  const refreshCollectionStatus = useCallback(async () => {
     if (!antique?.id || !user?.id || !isSupabaseConfigured() || !supabase) {
       setInAnyCollection(false);
       setCollectionForLink(null);
       return;
     }
-    (async () => {
-      const { data } = await supabase
-        .from('collections')
-        .select('id, collection_name, antiques_ids')
-        .eq('user_id', user.id);
-      const list = data ?? [];
-      const aid = antique.id;
-      const found = list.find((c) => Array.isArray(c.antiques_ids) && c.antiques_ids.includes(aid));
-      setInAnyCollection(!!found);
-      setCollectionForLink(found ?? null);
-    })();
+    const { data } = await supabase
+      .from('collections')
+      .select('id, collection_name, antiques_ids')
+      .eq('user_id', user.id);
+    const list = data ?? [];
+    const aid = antique.id;
+    const found = list.find((c) => Array.isArray(c.antiques_ids) && c.antiques_ids.includes(aid));
+    setInAnyCollection(!!found);
+    setCollectionForLink(found ?? null);
   }, [antique?.id, user?.id]);
+
+  useEffect(() => {
+    refreshCollectionStatus();
+  }, [refreshCollectionStatus]);
 
   const tabIndex = TAB_NAMES.indexOf(activeTab);
   const tabBarPadding = 4;
@@ -257,13 +266,14 @@ export default function ItemDetailsScreen({ route, navigation }) {
           })
           .eq('id', coll.id);
         if (error) throw error;
+        await refreshCollectionStatus();
         closeAddSheet();
         Alert.alert('Added', 'Item added to collection.');
       } catch (e) {
         Alert.alert('Error', e?.message || 'Failed to add to collection');
       }
     },
-    [antique?.id, supabase, closeAddSheet]
+    [antique?.id, supabase, closeAddSheet, refreshCollectionStatus]
   );
 
   const handleCreateNewCollection = useCallback(async () => {
@@ -278,12 +288,13 @@ export default function ItemDetailsScreen({ route, navigation }) {
         updated_at: now,
       });
       if (error) throw error;
+      await refreshCollectionStatus();
       closeAddSheet();
       Alert.alert('Added', 'New collection created and item added.');
     } catch (e) {
       Alert.alert('Error', e?.message || 'Failed to create collection');
     }
-  }, [user?.id, antique?.id, supabase, closeAddSheet]);
+  }, [user?.id, antique?.id, supabase, closeAddSheet, refreshCollectionStatus]);
 
   if (loading) {
     return (
@@ -363,9 +374,9 @@ export default function ItemDetailsScreen({ route, navigation }) {
 
   const formatPurchasePrice = (v) => {
     if (v == null || v === '') return '—';
-    const n = Number(v);
-    if (Number.isNaN(n)) return '—';
-    return `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    const converted = rate * Number(v);
+    if (Number.isNaN(converted)) return '—';
+    return formatPriceWithCurrency(converted, displayCurrency);
   };
 
   const cardWidth = (width - 32 - 16) / 3;
@@ -424,7 +435,7 @@ export default function ItemDetailsScreen({ route, navigation }) {
           <Text style={styles.marketValueSubtitle}>Current market range based on recent auctions</Text>
           <View style={styles.marketValueRangeRow}>
             <Text style={styles.marketValueRange}>
-              ${antique.market_value_min ?? 0} – ${antique.market_value_max ?? 0}
+              {formatPriceRangeUsd(antique.market_value_min, antique.market_value_max, displayCurrency, rate)}
             </Text>
             <View style={styles.marketValueGrowth}>
               <Text style={styles.marketValueGrowthText}>+{growthPct}% /year</Text>

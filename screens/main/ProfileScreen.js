@@ -18,11 +18,12 @@ import { colors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useOnboardingStore } from '../../stores/useOnboardingStore';
+import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 
 const GENERAL_ITEMS = [
   { id: 'subscription', icon: 'diamond', label: 'Manage Subscription', route: 'Pro' },
   { id: 'restore', icon: 'refresh', label: 'Restore Membership', route: null },
-  { id: 'currency', icon: 'cash-outline', label: 'Currency', value: 'USD', route: null },
+  { id: 'currency', icon: 'cash-outline', label: 'Preferred Currency', route: 'PreferredCurrency' },
   { id: 'settings', icon: 'settings-outline', label: 'App Settings', route: 'AppSettings' },
 ];
 
@@ -59,6 +60,7 @@ export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
+  const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
   const tabNav = navigation.getParent();
   const mainStack = tabNav; // MainStack: contains MainTabs + AppSettings, Pro, EditProfile, etc.
   const rootNav = tabNav?.getParent();
@@ -191,7 +193,7 @@ export default function ProfileScreen({ navigation }) {
                 key={item.id}
                 icon={item.icon}
                 label={item.label}
-                value={item.value}
+                value={item.id === 'currency' ? preferredCurrency : item.value}
                 onPress={item.route ? () => navigateTo(item.route) : undefined}
               />
             ))}
@@ -301,8 +303,8 @@ const styles = StyleSheet.create({
     color: colors.textWhite,
   },
   editBtn: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 22,
     backgroundColor: colors.border3,
     justifyContent: 'center',
