@@ -4,16 +4,18 @@
     "slug": "Antique",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "com.webnum.antique",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/Splash_Screen.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#A98142"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.webnum.antique"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,6 +26,28 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Antique to access your camera"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Antique to access your photos for the last photo preview."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Antique to access your photos to change profile picture."
+        }
+      ],
+      "expo-web-browser"
+    ]
   }
 }
