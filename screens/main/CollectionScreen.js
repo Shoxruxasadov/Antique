@@ -76,6 +76,7 @@ function CollectionCard({ title, count, thumbnails, onPress }) {
 
 const TAB_NAMES = ['details', 'history'];
 const COLLECTION_CARD_COUNT = 4;
+const HISTORY_CARD_ANIM_COUNT = 30;
 const DELAY_STEP = 70;
 const ANIM_DURATION = 550;
 const EASE_OUT = Easing.bezier(0.25, 0.1, 0.25, 1);
@@ -87,7 +88,14 @@ function createCardAnims() {
   }));
 }
 
-export default function CollectionScreen({ navigation }) {
+function createHistoryCardAnims() {
+  return Array.from({ length: HISTORY_CARD_ANIM_COUNT }, () => ({
+    opacity: new Animated.Value(0),
+    translateY: new Animated.Value(36),
+  }));
+}
+
+export default function CollectionScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const user = useAuthStore((s) => s.user);
@@ -107,6 +115,7 @@ export default function CollectionScreen({ navigation }) {
   const [creating, setCreating] = useState(false);
   const [showHistoryOptionsSheet, setShowHistoryOptionsSheet] = useState(false);
   const [selectedSnap, setSelectedSnap] = useState(null);
+  const [focusKey, setFocusKey] = useState(0);
   const tabIndex = TAB_NAMES.indexOf(activeTab);
   const sheetOverlayOpacity = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
@@ -214,7 +223,13 @@ export default function CollectionScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      if (!returnedFromChildRef.current) setActiveTab('details');
+      const openToHistory = useAppSettingsStore.getState().openCollectionToHistory;
+      if (openToHistory) {
+        useAppSettingsStore.getState().setOpenCollectionToHistory(false);
+        setActiveTab('history');
+      } else if (!returnedFromChildRef.current) {
+        setActiveTab('details');
+      }
       returnedFromChildRef.current = false;
       if (!user?.id || !isSupabaseConfigured() || !supabase) {
         setCollections([]);
@@ -319,6 +334,8 @@ export default function CollectionScreen({ navigation }) {
   };
 
   const cardAnims = useRef(createCardAnims()).current;
+  const historyCardAnims = useRef(createHistoryCardAnims()).current;
+  const shouldPlayHistoryAnimsRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -345,6 +362,11 @@ export default function CollectionScreen({ navigation }) {
           ]),
         ]).start();
       });
+      shouldPlayHistoryAnimsRef.current = true;
+      setFocusKey((k) => k + 1);
+      return () => {
+        shouldPlayHistoryAnimsRef.current = false;
+      };
     }, [cardAnims])
   );
 
@@ -357,6 +379,46 @@ export default function CollectionScreen({ navigation }) {
       friction: 11,
     }).start();
   }, [tabIndex, indicatorLeft, tabWidth, tabGap]);
+
+  // History cards: stagger animation only when page opens (focus), not when switching tabs
+  useEffect(() => {
+    if (!shouldPlayHistoryAnimsRef.current || snapHistory.length === 0) return;
+    shouldPlayHistoryAnimsRef.current = false;
+    const n = Math.min(snapHistory.length, HISTORY_CARD_ANIM_COUNT);
+    const anims = historyCardAnims;
+    for (let i = 0; i < n; i++) {
+      anims[i].opacity.setValue(0);
+      anims[i].translateY.setValue(36);
+    }
+    for (let i = 0; i < n; i++) {
+      Animated.sequence([
+        Animated.delay(i * DELAY_STEP),
+        Animated.parallel([
+          Animated.timing(anims[i].opacity, {
+            toValue: 1,
+            duration: ANIM_DURATION,
+            easing: EASE_OUT,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anims[i].translateY, {
+            toValue: 0,
+            duration: ANIM_DURATION,
+            easing: EASE_OUT,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    }
+    // Ensure all cards (including 0) end visible after entrance animation
+    const totalMs = (n - 1) * DELAY_STEP + ANIM_DURATION + 80;
+    const t = setTimeout(() => {
+      for (let i = 0; i < n; i++) {
+        anims[i].opacity.setValue(1);
+        anims[i].translateY.setValue(0);
+      }
+    }, totalMs);
+    return () => clearTimeout(t);
+  }, [focusKey, snapHistory.length, historyCardAnims]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -489,54 +551,62 @@ export default function CollectionScreen({ navigation }) {
                 </Text>
               </Animated.View>
             ) : (
-              snapHistory.map((snap) => {
-                const category = Array.isArray(snap.payload?.category)?.[0] || snap.payload?.category || 'Antique';
+              snapHistory.map((snap, idx) => {
+                const category = Array.isArray(snap.payload?.category)
+                  ? snap.payload.category.join(', ')
+                  : (snap.payload?.category || 'Antique');
                 const min = snap.payload?.market_value_min;
                 const max = snap.payload?.market_value_max;
                 const priceStr = min != null && max != null ? formatPriceRangeUsd(min, max, displayCurrency, rate) : '';
+                const animIdx = Math.min(idx, HISTORY_CARD_ANIM_COUNT - 1);
+                const anim = historyCardAnims[animIdx];
                 return (
-                  <Pressable
+                  <Animated.View
                     key={snap.id}
-                    style={styles.historyRow}
-                    onPress={() => {
-                    if (snap.antique_id) {
-                      returnedFromChildRef.current = true;
-                      mainStack?.navigate('ItemDetails', { antiqueId: snap.antique_id, fromHistory: true });
-                    }
-                  }}
+                    style={{ opacity: anim.opacity, transform: [{ translateY: anim.translateY }] }}
                   >
-                    <View style={styles.historyThumbWrap}>
-                      {snap.image_url ? (
-                        <Image source={{ uri: snap.image_url }} style={styles.historyThumb} resizeMode="cover" />
-                      ) : (
-                        <View style={[styles.historyThumb, styles.historyThumbEmpty]} />
-                      )}
-                    </View>
-                    <View style={styles.historyInfo}>
-                      <Text style={styles.historyTitle} numberOfLines={1}>
-                        {snap.payload?.name || 'Scan'}
-                      </Text>
-                      <Text style={styles.historyCategory} numberOfLines={1}>
-                        {category}
-                      </Text>
-                      {priceStr ? (
-                        <Text style={styles.historyPrice} numberOfLines={1}>
-                          {priceStr}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <TouchableOpacity
-                      style={styles.historyMenu}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setSelectedSnap(snap);
-                        setShowHistoryOptionsSheet(true);
+                    <Pressable
+                      style={styles.historyRow}
+                      onPress={() => {
+                        if (snap.antique_id) {
+                          returnedFromChildRef.current = true;
+                          mainStack?.navigate('ItemDetails', { antiqueId: snap.antique_id, fromHistory: true });
+                        }
                       }}
-                      hitSlop={12}
                     >
-                      <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </Pressable>
+                      <View style={styles.historyThumbWrap}>
+                        {snap.image_url ? (
+                          <Image source={{ uri: snap.image_url }} style={styles.historyThumb} resizeMode="cover" />
+                        ) : (
+                          <View style={[styles.historyThumb, styles.historyThumbEmpty]} />
+                        )}
+                      </View>
+                      <View style={styles.historyInfo}>
+                        <Text style={styles.historyTitle} numberOfLines={1}>
+                          {snap.payload?.name || 'Scan'}
+                        </Text>
+                        <Text style={styles.historyCategory} numberOfLines={1}>
+                          {category}
+                        </Text>
+                        {priceStr ? (
+                          <Text style={styles.historyPrice} numberOfLines={1}>
+                            {priceStr}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.historyMenu}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setSelectedSnap(snap);
+                          setShowHistoryOptionsSheet(true);
+                        }}
+                        hitSlop={12}
+                      >
+                        <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </Pressable>
+                  </Animated.View>
                 );
               })
             )}
@@ -766,7 +836,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bgWhite,
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 12,
     marginBottom: 10,
     shadowColor: '#000',
@@ -779,7 +849,7 @@ const styles = StyleSheet.create({
   historyThumb: {
     width: 64,
     height: 64,
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: colors.border3,
     overflow: 'hidden',
   },

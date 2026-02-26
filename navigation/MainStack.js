@@ -3,13 +3,12 @@ import MainTabs from './MainTabs';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import AppSettingsScreen from '../screens/settings/AppSettingsScreen';
 import PreferredCurrencyScreen from '../screens/settings/PreferredCurrencyScreen';
-import CreateSpaceScreen from '../screens/main/CreateSpaceScreen';
-import IdentifyScreen from '../screens/main/IdentifyScreen';
-import SnapTipsScreen from '../screens/main/SnapTipsScreen';
-import InfoScannerScreen from '../screens/main/InfoScannerScreen';
-import ItemDetailsScreen from '../screens/main/ItemDetailsScreen';
-import AnalyzingScreen from '../screens/main/AnalyzingScreen';
-import CollectionDetailScreen from '../screens/main/CollectionDetailScreen';
+import ScannerScreen from '../screens/stack/ScannerScreen';
+import InfoScannerScreen from '../screens/stack/InfoScannerScreen';
+import AntiqueScreen from '../screens/stack/AntiqueScreen';
+import CollectionDetailScreen from '../screens/stack/CollectionDetailScreen';
+import AllPostsScreen from '../screens/stack/AllPostsScreen';
+import PostScreen from '../screens/stack/PostScreen';
 import ProScreen from '../screens/settings/ProScreen';
 import AssistantScreen from '../screens/main/AssistantScreen';
 
@@ -26,13 +25,12 @@ export default function MainStack() {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="AppSettings" component={AppSettingsScreen} />
       <Stack.Screen name="PreferredCurrency" component={PreferredCurrencyScreen} />
-      <Stack.Screen name="CreateSpace" component={CreateSpaceScreen} />
-      <Stack.Screen name="Identify" component={IdentifyScreen} />
-      <Stack.Screen name="SnapTips" component={SnapTipsScreen} />
+      <Stack.Screen name="Identify" component={ScannerScreen} />
       <Stack.Screen name="InfoScanner" component={InfoScannerScreen} />
-      <Stack.Screen name="ItemDetails" component={ItemDetailsScreen} />
-      <Stack.Screen name="Analyzing" component={AnalyzingScreen} />
+      <Stack.Screen name="ItemDetails" component={AntiqueScreen} />
       <Stack.Screen name="CollectionDetail" component={CollectionDetailScreen} />
+      <Stack.Screen name="AllPosts" component={AllPostsScreen} />
+      <Stack.Screen name="Post" component={PostScreen} />
       <Stack.Screen name="Pro" component={ProScreen} />
       <Stack.Screen name="AssistantChat" component={AssistantScreen} />
     </Stack.Navigator>

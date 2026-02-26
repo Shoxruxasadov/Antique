@@ -1,117 +1,200 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   Pressable,
-  ScrollView,
+  Image,
+  Dimensions,
+  Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../theme';
+import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
+import { fonts } from '../../theme';
+
+const COUNTDOWN_MS = 3000;
+const PROGRESS_SIZE = 32;
+const PROGRESS_STROKE = 3;
+const PROGRESS_R = PROGRESS_SIZE / 2 - PROGRESS_STROKE / 2;
+const CIRCUMFERENCE = 2 * Math.PI * PROGRESS_R;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const HEADER_IMAGE_HEIGHT = 290;
+const GRADIENT_HEIGHT = 140;
+
+// PRO screen only – always dark mode (ignores app theme)
+const PRO_DARK = {
+  bg: '#000000',
+  bgCard: '#1A1A1A',
+  text: '#FFFFFF',
+  textMuted: '#B0B0B0',
+  border: '#3A3A3A',
+  borderGold: '#C9A227',
+  gold: '#C9A227',
+  green: '#44D84B',
+};
 
 const FEATURES = [
-  'Unlimited Antique Scans every day',
-  'Detailed Valuation Reports and insights',
+  'Unlimited antique scans every day',
+  'Detailed Valuations Report and insights',
   'Provenance & History Breakdown',
+  'Ad-Free Experience',
 ];
 
 export default function ProScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [plan, setPlan] = useState('annual'); // 'monthly' | 'annual'
+  const [plan, setPlan] = useState('monthly'); // 'monthly' | 'annual'
+  const [showClose, setShowClose] = useState(false);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const closeOpacity = useRef(new Animated.Value(0)).current;
+  const progressOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: COUNTDOWN_MS,
+      useNativeDriver: false,
+    }).start(() => {
+      Animated.parallel([
+        Animated.timing(progressOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(closeOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setShowClose(true));
+    });
+  }, []);
+
+  const strokeDashoffset = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [CIRCUMFERENCE, 0],
+  });
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-      <StatusBar style="dark" />
+    <View style={[styles.container, { paddingBottom: insets.bottom + 24 }]}>
+      <StatusBar style="light" backgroundColor="transparent" />
 
-      <Pressable
-        style={[styles.closeBtn, { top: insets.top + 12 }]}
-        onPress={() => navigation.goBack()}
-      >
-        <Ionicons name="close" size={28} color={colors.textBase} />
-      </Pressable>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Crown icon */}
-        <View style={styles.crownIconWrap}>
-          <Ionicons name="diamond" size={40} color={colors.textBase} />
+      {/* Header image + gradient — image under status bar so bar is transparent */}
+      <View style={[styles.headerImageWrap, { height: HEADER_IMAGE_HEIGHT }]}>
+        <Image
+          source={require('../../assets/PRO.png')}
+          style={[styles.headerImage, { top: 0, height: HEADER_IMAGE_HEIGHT + insets.top * 4 }]}
+          resizeMode="cover"
+        />
+        <View style={[styles.gradientOverlay, { bottom: 0, height: GRADIENT_HEIGHT }]} pointerEvents="none">
+          <Svg width={SCREEN_WIDTH} height={GRADIENT_HEIGHT} style={styles.gradientSvg}>
+            <Defs>
+              <LinearGradient id="proFade" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="transparent" stopOpacity="0" />
+                <Stop offset="0.5" stopColor={PRO_DARK.bg} stopOpacity="0.6" />
+                <Stop offset="1" stopColor={PRO_DARK.bg} stopOpacity="1" />
+              </LinearGradient>
+            </Defs>
+            <Rect x={0} y={0} width={SCREEN_WIDTH} height={GRADIENT_HEIGHT} fill="url(#proFade)" />
+          </Svg>
         </View>
+        {/* 3s progress circle — then fade out; X fades in */}
+        <View style={[styles.closeBtnWrap, { top: insets.top + 12 }]} pointerEvents="box-none">
+          <Animated.View style={[styles.progressWrap, { opacity: progressOpacity }]} pointerEvents="none">
+            <Svg width={PROGRESS_SIZE} height={PROGRESS_SIZE} style={styles.progressSvg}>
+              <Circle
+                cx={PROGRESS_SIZE / 2}
+                cy={PROGRESS_SIZE / 2}
+                r={PROGRESS_R}
+                stroke="rgba(255,255,255,0.3)"
+                strokeWidth={PROGRESS_STROKE}
+                fill="none"
+              />
+              <AnimatedCircle
+                cx={PROGRESS_SIZE / 2}
+                cy={PROGRESS_SIZE / 2}
+                r={PROGRESS_R}
+                stroke={PRO_DARK.text}
+                strokeWidth={PROGRESS_STROKE}
+                fill="none"
+                strokeDasharray={CIRCUMFERENCE}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                transform={`rotate(-90 ${PROGRESS_SIZE / 2} ${PROGRESS_SIZE / 2})`}
+              />
+            </Svg>
+          </Animated.View>
+          <Animated.View style={[styles.closeBtnAnimated, { opacity: closeOpacity }]} pointerEvents={showClose ? 'box-none' : 'none'}>
+            <Pressable style={styles.closeBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="close-sharp" size={28} color={PRO_DARK.text} />
+            </Pressable>
+          </Animated.View>
+        </View>
+      </View>
 
-        <Text style={styles.headline}>Elevate Your Collection</Text>
+      <View style={[styles.scrollContent, { transform: [{ translateY: -10 }] }]}>
+        <Text style={styles.headline}>Upgrade to PRO</Text>
         <Text style={styles.description}>
-          Join thousands of collectors who trust our AI-powered authentication and valuation
+          Collect cards and enjoy exclusive features and benefits
         </Text>
 
-        {/* Features */}
         {FEATURES.map((item, i) => (
           <View key={i} style={styles.featureRow}>
-            <Ionicons name="checkmark-circle" size={22} color={colors.green} />
+            <Ionicons name="checkmark" size={24} color={PRO_DARK.text} />
             <Text style={styles.featureText}>{item}</Text>
           </View>
         ))}
 
-        {/* Monthly plan */}
-        <Pressable
-          style={[styles.planCard, plan !== 'annual' && styles.planCardSelected]}
-          onPress={() => setPlan('monthly')}
-        >
-          <View style={styles.planLeft}>
-            <View style={[styles.radio, plan === 'monthly' && styles.radioSelected]}>
-              {plan === 'monthly' && <Ionicons name="checkmark" size={14} color={colors.brand} />}
+        <View style={styles.planRow}>
+          <Pressable
+            style={[styles.planCard, plan === 'monthly' && styles.planCardSelected]}
+            onPress={() => setPlan('monthly')}
+          >
+            <View style={[styles.planCardBadge, plan === 'monthly' && styles.planCardBadgeSelected]}>
+              {plan === 'monthly' ? (
+                <Ionicons name="checkmark-sharp" size={14} color={PRO_DARK.backgroundColor} />
+              ) : null}
             </View>
-            <View>
-              <Text style={styles.planTitle}>Monthly</Text>
-              <Text style={styles.planSub}>First 3 days free then paid</Text>
-            </View>
-          </View>
-          <Text style={styles.planPrice}>$3.99</Text>
-        </Pressable>
+            <Text style={styles.planTitle}>Monthly</Text>
+            <Text style={styles.planSub}>3 day free trial</Text>
+          </Pressable>
 
-        {/* Annual plan */}
-        <Pressable
-          style={[styles.planCard, styles.planCardAnnual, plan === 'annual' && styles.planCardSelected]}
-          onPress={() => setPlan('annual')}
-        >
-          <View style={styles.planLeft}>
-            <View style={[styles.radio, styles.radioAnnual, plan === 'annual' && styles.radioSelected]}>
-              {plan === 'annual' && <Ionicons name="checkmark" size={14} color={colors.brand} />}
+          <Pressable
+            style={[styles.planCard, plan === 'annual' && styles.planCardSelected]}
+            onPress={() => setPlan('annual')}
+          >
+            <View style={[styles.planCardBadge, plan === 'annual' && styles.planCardBadgeSelected]}>
+              {plan === 'annual' ? (
+                <Ionicons name="checkmark-sharp" size={14} color={PRO_DARK.backgroundColor} />
+              ) : null}
             </View>
-            <View>
-              <Text style={styles.planTitle}>Annual</Text>
-              <Text style={styles.planSub}>
-                <Text style={styles.planSubStrike}>$49.99</Text> $39.99 / year
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.planPrice}>$32.99</Text>
-        </Pressable>
-
-        <View style={styles.trialRow}>
-          <Ionicons name="checkmark-circle" size={20} color={colors.green} />
-          <Text style={styles.trialText}>No payments due now</Text>
+            <Text style={styles.planTitle}>Annual</Text>
+            <Text style={styles.planSub}>3 day free trial</Text>
+          </Pressable>
         </View>
 
+        <Text style={styles.pricingNote}>1st month $0.99, then just $3.99/month</Text>
+
         <Pressable style={styles.ctaBtn}>
-          <Text style={styles.ctaBtnText}>Start my 7-day trial</Text>
+          <Text style={styles.ctaBtnText}>Start 3 day free trial</Text>
         </Pressable>
 
         <View style={styles.footer}>
           <Pressable onPress={() => {}}>
-            <Text style={styles.footerLink}>Terms of Use</Text>
-          </Pressable>
-          <Pressable onPress={() => {}}>
-            <Text style={styles.footerLink}>Privacy Policy</Text>
+            <Text style={styles.footerLink}>Terms of Service</Text>
           </Pressable>
           <Pressable onPress={() => {}}>
             <Text style={styles.footerLink}>Restore</Text>
           </Pressable>
+          <Pressable onPress={() => {}}>
+            <Text style={styles.footerLink}>Privacy Policy</Text>
+          </Pressable>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -119,148 +202,169 @@ export default function ProScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgWhite,
+    backgroundColor: PRO_DARK.bg,
   },
-  closeBtn: {
+  headerImageWrap: {
+    position: 'relative',
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  headerImage: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    width: SCREEN_WIDTH,
+  },
+  gradientOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  gradientSvg: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  closeBtnWrap: {
     position: 'absolute',
     left: 20,
     zIndex: 10,
-    padding: 4,
+    width: PROGRESS_SIZE,
+    height: PROGRESS_SIZE,
+  },
+  progressWrap: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: PROGRESS_SIZE,
+    height: PROGRESS_SIZE,
+  },
+  progressSvg: {},
+  closeBtnAnimated: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: PROGRESS_SIZE,
+    height: PROGRESS_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtn: {
+    padding: 6,
+    margin: -6,
   },
   scrollContent: {
+    flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 52,
-    paddingBottom: 24,
-  },
-  crownIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    backgroundColor: colors.brandLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginBottom: 20,
+    paddingBottom: 32,
   },
   headline: {
     fontFamily: fonts.bold,
-    fontSize: 24,
-    color: colors.textBase,
+    fontSize: 30,
+    lineHeight: 38,
+    color: PRO_DARK.text,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   description: {
     fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
+    fontSize: 16,
+    color: PRO_DARK.text,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
     marginBottom: 24,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
     marginBottom: 12,
+    marginLeft: 12,
   },
   featureText: {
-    fontFamily: fonts.regular,
+    fontFamily: fonts.medium,
     fontSize: 16,
-    color: colors.textBase,
+    color: PRO_DARK.text,
     flex: 1,
+  },
+  planRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginVertical: 24,
   },
   planCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.bgWhite,
+    flex: 1,
+    position: 'relative',
+    backgroundColor: PRO_DARK.bgCard,
     borderWidth: 1,
-    borderColor: colors.border3,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-  },
-  planCardAnnual: {
-    borderColor: colors.border3,
+    borderColor: PRO_DARK.border,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
   },
   planCardSelected: {
-    borderColor: colors.brand,
-    backgroundColor: colors.brandLight,
+    borderColor: PRO_DARK.borderGold,
   },
-  planLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    flex: 1,
-  },
-  radio: {
+  planCardBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.border3,
+    borderColor: PRO_DARK.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  radioAnnual: {
-    borderColor: colors.border3,
-  },
-  radioSelected: {
-    borderColor: colors.brand,
-    backgroundColor: colors.bgWhite,
+  planCardBadgeSelected: {
+    borderColor: PRO_DARK.borderGold,
+    backgroundColor: PRO_DARK.gold,
   },
   planTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 16,
-    color: colors.textBase,
+    fontFamily: fonts.semiBold,
+    fontSize: 18,
+    lineHeight: 28,
+    color: PRO_DARK.text,
+    marginBottom: 4,
   },
   planSub: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  planSubStrike: {
-    textDecorationLine: 'line-through',
-  },
-  planPrice: {
-    fontFamily: fonts.bold,
+    fontFamily: fonts.medium,
     fontSize: 16,
-    color: colors.textBase,
+    lineHeight: 24,
+    color: PRO_DARK.textMuted,
   },
-  trialRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
+  pricingNote: {
+    fontFamily: fonts.regular,
+    fontSize: 16,
+    color: PRO_DARK.textMuted,
+    textAlign: 'center',
     marginBottom: 24,
   },
-  trialText: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textBase,
-  },
   ctaBtn: {
-    backgroundColor: colors.bgInverted,
-    paddingVertical: 16,
-    borderRadius: 14,
+    backgroundColor: PRO_DARK.text,
+    paddingVertical: 17,
+    borderRadius: 16,
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   ctaBtnText: {
     fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textWhite,
+    fontSize: 17,
+    color: PRO_DARK.bg,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   footerLink: {
     fontFamily: fonts.regular,
     fontSize: 13,
-    color: colors.textBase,
+    color: PRO_DARK.textMuted,
   },
 });

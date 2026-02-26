@@ -305,8 +305,6 @@ const styles = StyleSheet.create({
   editBtn: {
     width: 40,
     height: 40,
-    borderRadius: 22,
-    backgroundColor: colors.border3,
     justifyContent: 'center',
     alignItems: 'center',
   },

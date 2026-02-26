@@ -9,10 +9,19 @@ export const useAppSettingsStore = create(
       setVibration: (vibration) => set({ vibration }),
       preferredCurrency: 'USD',
       setPreferredCurrency: (preferredCurrency) => set({ preferredCurrency }),
+      openCollectionToHistory: false,
+      setOpenCollectionToHistory: (openCollectionToHistory) => set({ openCollectionToHistory }),
+      collectionViewMode: 'list',
+      setCollectionViewMode: (collectionViewMode) => set({ collectionViewMode }),
     }),
     {
       name: 'antique-app-settings',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        vibration: state.vibration,
+        preferredCurrency: state.preferredCurrency,
+        collectionViewMode: state.collectionViewMode,
+      }),
     }
   )
 );

@@ -8,13 +8,14 @@ export const lightTheme = {
   brand: '#A98142',
   brandElevated: '#C09440',
   brandLight: '#F7F8F4',
-  brandLightElevated: '#CDCBC4',
+  brandLightElevated: '#EDE9D4',
 
   // Background
   bgBase: '#F7F8F4',
   bgBaseElevated: '#E7E5E4',
   bgLight: '#FFFFFF',
   bgWhite: '#FFFFFF',
+  bgWhiteA3: '#FFFFFFA3',
   bgBrandLayer: '#F7F8F4',
   bgInverted: '#1C1917',
   bgDark: '#1C1917',
@@ -30,7 +31,7 @@ export const lightTheme = {
 
   // Border
   border1: '#F7F8F4',
-  border2: '#C7E5D4',
+  border2: '#E7E5E4',
   border3: '#DCD9D6',
   borderBrand: '#A98142',
   borderDark: '#6D6D6D',

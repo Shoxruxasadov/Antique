@@ -44,7 +44,7 @@ export default function AppSettingsScreen({ navigation }) {
 
         <View style={styles.content}>
           {/* Notifications */}
-          <View style={styles.card}>
+          {/* <View style={styles.card}>
             <Text style={styles.label}>{t('appSettings.notifications')}</Text>
             <Switch
               value={notifications}
@@ -52,7 +52,7 @@ export default function AppSettingsScreen({ navigation }) {
               trackColor={{ false: '#E5E5E5', true: colors.green }}
               thumbColor="#FFFFFF"
             />
-          </View>
+          </View> */}
 
           {/* Vibration */}
           <View style={styles.card}>
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    gap: 12,
+    gap: 4,
   },
   card: {
     flexDirection: 'row',
