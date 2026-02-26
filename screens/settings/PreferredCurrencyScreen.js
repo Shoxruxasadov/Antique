@@ -91,7 +91,7 @@ export default function PreferredCurrencyScreen({ navigation }) {
         data={filtered}
         keyExtractor={(item) => item.code}
         style={styles.list}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => {

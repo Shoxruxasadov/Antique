@@ -72,7 +72,7 @@ export default function MainTabs() {
         component={PlaceholderScreen}
         options={{
           tabBarButton: (props) => <AssistantTabButton {...props} />,
-          tabBarLabel: 'Assistant',
+          tabBarLabel: 'Ask expert',
         }}
       />
       <Tab.Screen

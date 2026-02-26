@@ -15,7 +15,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { pickImageFromGallery } from "../../lib/pickImage";
+import * as ImagePicker from "expo-image-picker";
 import { colors, fonts } from "../../theme";
 import { useAssistantStore } from "../../stores/useAssistantStore";
 import { chatWithGemini } from "../../lib/gemini";
@@ -145,14 +145,24 @@ export default function AssistantScreen({ navigation }) {
     sendText(text);
   };
 
-  const pickImage = async () => {
+  const openGallery = async () => {
     try {
-      const result = await pickImageFromGallery();
-      if (!result) return;
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Allow access to photos to send images.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
       setPendingImage({
-        uri: result.uri,
-        base64: result.base64,
-        mimeType: result.mimeType,
+        uri: asset.uri,
+        base64: asset.base64 ?? "",
+        mimeType: asset.uri?.toLowerCase?.().endsWith(".png") ? "image/png" : "image/jpeg",
       });
       setImageCaption("");
     } catch (e) {
@@ -321,7 +331,7 @@ export default function AssistantScreen({ navigation }) {
           <View
             style={[styles.inputBar, { paddingBottom: insets.bottom + 12 }]}
           >
-            <Pressable style={styles.inputBarIcon} onPress={pickImage}>
+            <Pressable style={styles.inputBarIcon} onPress={openGallery}>
               <Ionicons
                 name="camera-outline"
                 size={24}

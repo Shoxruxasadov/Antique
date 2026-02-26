@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
-import { pickImageFromGallery } from "../../lib/pickImage";
+import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { colors, fonts } from "../../theme";
 import { useAuthStore } from "../../stores/useAuthStore";
@@ -560,9 +560,17 @@ export default function ScannerScreen({ navigation }) {
           style={styles.galleryButton}
           onPress={async () => {
             try {
-              const result = await pickImageFromGallery();
-              if (!result?.uri) return;
-              openScanModal(result.uri, result.base64);
+              const { status } =
+                await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== "granted") return;
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.8,
+                base64: true,
+              });
+              if (result.canceled || !result.assets?.[0]?.uri) return;
+              const asset = result.assets[0];
+              openScanModal(asset.uri, asset.base64);
             } catch (e) {
               console.warn("Gallery error", e);
             }

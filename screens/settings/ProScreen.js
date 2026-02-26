@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingBottom: 32,
   },
   headline: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
-    marginLeft: 12,
+    marginLeft: 4,
   },
   featureText: {
     fontFamily: fonts.medium,
