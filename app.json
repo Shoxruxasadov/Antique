@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.webnum.antique"
+      "bundleIdentifier": "com.webnum.antique",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -53,12 +54,6 @@
         "expo-media-library",
         {
           "photosPermission": "Allow Antique to access your photos for the last photo preview."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow Antique to access your photos to change profile picture."
         }
       ],
       "expo-web-browser"

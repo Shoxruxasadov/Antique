@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
+import { pickAndResizeAvatar } from '../../lib/pickImage';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts } from '../../theme';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -40,22 +40,13 @@ export default function EditProfileScreen({ navigation }) {
   }, [user?.id]);
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow access to photos to change avatar.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.6,
-      base64: true,
-    });
-    if (!result.canceled && result.assets?.[0]) {
-      const asset = result.assets[0];
-      setAvatarUri(asset.uri);
-      setAvatarBase64(asset.base64 ?? null);
+    try {
+      const result = await pickAndResizeAvatar(300);
+      if (!result) return;
+      setAvatarUri(result.uri);
+      setAvatarBase64(result.base64 || null);
+    } catch (_) {
+      Alert.alert('Error', 'Could not pick image.');
     }
   };
 

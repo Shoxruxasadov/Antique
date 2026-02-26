@@ -279,7 +279,7 @@ export default function HomeScreen({ navigation }) {
         </Animated.View>
 
         {/* Row 1: Snap History — card 2 */}
-        <Animated.View
+        {lastSnaps.length>0 && <Animated.View
           style={{
             opacity: cardAnims[2].opacity,
             transform: [{ translateY: cardAnims[2].translateY }],
@@ -373,7 +373,7 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.seeAllText}>See All</Text>
             </Pressable>
           </ScrollView>
-        </Animated.View>
+        </Animated.View>}
 
         {/* Row 2: Collectors Blog — card 3 */}
         <Animated.View
