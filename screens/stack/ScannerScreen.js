@@ -263,6 +263,7 @@ export default function ScannerScreen({ navigation }) {
           market_value_max,
           avg_growth_percentage,
           image_urls: ebayImageUrls,
+          ebay_links: ebayLinks = [],
         } = await fetchMarketPricesFromEbay(geminiResult.search_keywords || []);
         if (cancelled) return;
         setCompletedSteps(2);
@@ -325,7 +326,12 @@ export default function ScannerScreen({ navigation }) {
           category: Array.isArray(geminiResult.category)
             ? geminiResult.category
             : ["Antique"],
-          specification: geminiResult.specification ?? {},
+          specification: {
+            ...(geminiResult.specification ?? {}),
+            ...(Array.isArray(ebayLinks) && ebayLinks.length > 0
+              ? { ebay_links: ebayLinks }
+              : {}),
+          },
           origin_provenance: geminiResult.origin_provenance ?? "",
           source: geminiResult.source ?? "AI Analysis",
           purchase_price: geminiResult.purchase_price ?? null,
@@ -369,6 +375,9 @@ export default function ScannerScreen({ navigation }) {
           market_value_min,
           market_value_max,
           avg_growth_percentage,
+          ...(Array.isArray(ebayLinks) && ebayLinks.length > 0
+            ? { ebay_links: ebayLinks }
+            : {}),
         };
         const { error: snapErr } = await supabase.from("snap_history").insert({
           user_id: userId,
