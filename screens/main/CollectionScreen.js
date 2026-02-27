@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -21,13 +21,13 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../theme';
+import { Plus, DotsThreeOutlineVerticalIcon, Trash } from 'phosphor-react-native';
+import { useColors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
-import { formatPriceRangeUsd } from '../../lib/currency';
+import { formatPriceUsd } from '../../lib/currency';
 
 const THUMB_GAP = 7;
 const THUMB_COUNT = 2;
@@ -36,7 +36,7 @@ function isImageUrl(s) {
   return typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://'));
 }
 
-function CollectionCard({ title, count, thumbnails, onPress }) {
+function CollectionCard({ title, count, thumbnails, onPress, styles }) {
   const { width } = useWindowDimensions();
   const horizontalPadding = 16;
   const cardGap = 12;
@@ -97,6 +97,7 @@ function createHistoryCardAnims() {
 
 export default function CollectionScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
   const user = useAuthStore((s) => s.user);
   const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
@@ -128,6 +129,65 @@ export default function CollectionScreen({ navigation, route }) {
   const indicatorLeft = useRef(new Animated.Value(0)).current;
   const returnedFromChildRef = useRef(false);
   const prevUserIdRef = useRef(user?.id);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.bgBase },
+        header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, paddingTop: 8 },
+        headerTitle: { fontFamily: fonts.semiBold, fontSize: 24, color: colors.textBase },
+        addBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.textBase, justifyContent: 'center', alignItems: 'center' },
+        tabBarContainer: { paddingHorizontal: 16, marginBottom: 0 },
+        tabBarTrack: { position: 'relative', height: 48, backgroundColor: colors.bgBaseElevated, borderRadius: 12, padding: 4 },
+        tabRow: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, flexDirection: 'row', gap: 12, padding: 4 },
+        tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+        tabText: { fontFamily: fonts.medium, fontSize: 15, color: colors.textSecondary },
+        tabTextActive: { color: colors.textBase, fontFamily: fonts.semiBold },
+        tabIndicator: { position: 'absolute', left: 4, top: 4, bottom: 4, backgroundColor: colors.border1, borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+        scrollContent: { paddingHorizontal: 16 },
+        cardsRow: { flexDirection: 'row', gap: 12 },
+        collectionWrap: { marginBottom: 8 },
+        collectionCard: { backgroundColor: colors.bgWhite, borderRadius: 24, padding: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 24, elevation: 3 },
+        collectionTitle: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase, marginTop: 12, marginBottom: 2, marginLeft: 2 },
+        collectionCount: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginLeft: 2 },
+        thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: THUMB_GAP },
+        thumb: { borderRadius: 16, backgroundColor: colors.border3, overflow: 'hidden' },
+        thumbEmpty: { backgroundColor: colors.border1 },
+        loadingWrap: { paddingVertical: 48, alignItems: 'center' },
+        emptyHistory: { paddingVertical: 48, alignItems: 'center' },
+        emptyHistoryText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textSecondary, textAlign: 'center' },
+        emptyHistorySubtext: { textAlign: 'center', fontFamily: fonts.regular, fontSize: 14, color: colors.textTertiary, marginTop: 4, marginHorizontal: 16 },
+        historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgWhite, borderRadius: 20, padding: 12, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+        historyThumbWrap: { marginRight: 12 },
+        historyThumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.border3, overflow: 'hidden' },
+        historyThumbEmpty: {},
+        historyInfo: { flex: 1, minWidth: 0, marginLeft: 0 },
+        historyTitle: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase, marginBottom: 2 },
+        historyCategory: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
+        historyPrice: { fontFamily: fonts.medium, fontSize: 14, color: colors.brand },
+        historyMenu: { padding: 4 },
+        historyDate: { fontFamily: fonts.regular, fontSize: 13, color: colors.textTertiary, marginTop: 2 },
+        modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+        modalCard: { width: '100%', maxWidth: 340, backgroundColor: colors.bgWhite, borderRadius: 24, padding: 16 },
+        modalTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.textBase, textAlign: 'center', marginBottom: 16, lineHeight: 28 },
+        modalLabel: { fontFamily: fonts.regular, fontSize: 16, color: colors.textSecondary, marginBottom: 8 },
+        modalInput: { height: 48, borderRadius: 16, backgroundColor: colors.bgBase, paddingHorizontal: 16, fontSize: 16, fontFamily: fonts.medium, color: colors.textBase, marginBottom: 20 },
+        modalActions: { flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+        modalCancelBtn: { width: '48%', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, backgroundColor: colors.bgBase, alignItems: 'center' },
+        modalCancelText: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.textBase },
+        modalCreateBtn: { width: '48%', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center' },
+        modalCreateBtnDisabled: { opacity: 0.7 },
+        modalCreateText: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.textWhite },
+        sheetOverlay: { backgroundColor: 'rgba(0,0,0,0.4)' },
+        sheet: { backgroundColor: colors.bgWhite, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 24, paddingTop: 12 },
+        sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border3, alignSelf: 'center', marginBottom: 20 },
+        sheetTitle: { fontFamily: fonts.semiBold, fontSize: 18, color: colors.textBase, marginBottom: 16, textAlign: 'center' },
+        sheetRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border1, gap: 12 },
+        sheetRowText: { fontFamily: fonts.medium, fontSize: 16, color: colors.textBase },
+        sheetRowTextDanger: { color: colors.red },
+      }),
+    [colors]
+  );
 
   const FETCH_TIMEOUT_MS = 20000;
 
@@ -171,7 +231,13 @@ export default function CollectionScreen({ navigation, route }) {
       }
 
       const collList = collRes?.data ?? [];
-      const snapList = snapRes?.data ?? [];
+      const snapList = (snapRes?.data ?? []).slice().sort((a, b) => {
+        const ca = a.created_at ?? '';
+        const cb = b.created_at ?? '';
+        const byTime = cb.localeCompare(ca);
+        if (byTime !== 0) return byTime;
+        return String(b.id ?? '').localeCompare(String(a.id ?? ''));
+      });
       setCollections(collList);
       setSnapHistory(snapList);
 
@@ -213,7 +279,8 @@ export default function CollectionScreen({ navigation, route }) {
 
   const getCollectionThumbnails = useCallback(
     (coll) => {
-      const ids = (coll.antiques_ids || []).slice(0, 4);
+      // Oxirgi qo'shilgan item birinchi (eng tepada) bo'ladi
+      const ids = (coll.antiques_ids || []).slice().reverse().slice(0, 4);
       const thumbs = ids.map((id) => antiqueImageMap[id] ?? null);
       while (thumbs.length < 4) thumbs.push(null);
       return thumbs;
@@ -422,7 +489,7 @@ export default function CollectionScreen({ navigation, route }) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       {/* Header — card 0 */}
       <Animated.View style={{ opacity: cardAnims[0].opacity, transform: [{ translateY: cardAnims[0].translateY }] }}>
@@ -432,7 +499,7 @@ export default function CollectionScreen({ navigation, route }) {
             style={styles.addBtn}
             onPress={() => setShowCreateModal(true)}
           >
-            <Ionicons name="add" size={18} weight="bold" color="#fff" />
+            <Plus size={16} weight="bold" color={colors.textInverse} />
           </Pressable>
         </View>
       </Animated.View>
@@ -463,7 +530,7 @@ export default function CollectionScreen({ navigation, route }) {
                       activeTab === name && styles.tabTextActive,
                     ]}
                   >
-                    {name === 'details' ? 'Details' : 'History'}
+                    {name === 'details' ? 'Collections' : 'History'}
                   </Text>
                 </Pressable>
               ))}
@@ -509,6 +576,7 @@ export default function CollectionScreen({ navigation, route }) {
                         antiquesIds: coll.antiques_ids || [],
                       });
                     }}
+                    styles={styles}
                   />
                 </Animated.View>
               ))}
@@ -557,7 +625,9 @@ export default function CollectionScreen({ navigation, route }) {
                   : (snap.payload?.category || 'Antique');
                 const min = snap.payload?.market_value_min;
                 const max = snap.payload?.market_value_max;
-                const priceStr = min != null && max != null ? formatPriceRangeUsd(min, max, displayCurrency, rate) : '';
+                const est = snap.payload?.estimated_market_value_usd;
+                const currentValue = (min != null && Number(min) > 0) ? Number(min) : (max != null && Number(max) > 0) ? Number(max) : (est != null ? Number(est) : null);
+                const priceStr = currentValue != null && currentValue > 0 ? formatPriceUsd(currentValue, displayCurrency, rate) : '';
                 const animIdx = Math.min(idx, HISTORY_CARD_ANIM_COUNT - 1);
                 const anim = historyCardAnims[animIdx];
                 return (
@@ -603,7 +673,7 @@ export default function CollectionScreen({ navigation, route }) {
                         }}
                         hitSlop={12}
                       >
-                        <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
+                        <DotsThreeOutlineVerticalIcon size={20} color={colors.textSecondary} weight='fill' />
                       </TouchableOpacity>
                     </Pressable>
                   </Animated.View>
@@ -677,7 +747,7 @@ export default function CollectionScreen({ navigation, route }) {
               <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle}>Options</Text>
               <Pressable style={styles.sheetRow} onPress={handleDeleteSnap}>
-                <Ionicons name="trash-outline" size={22} color={colors.red} />
+                <Trash size={22} color={colors.red} />
                 <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Delete</Text>
               </Pressable>
             </Pressable>
@@ -687,310 +757,3 @@ export default function CollectionScreen({ navigation, route }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.brandLight,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: 8,
-  },
-  headerTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 24,
-
-    color: colors.textBase,
-  },
-  addBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.textBase,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabBarContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 0,
-  },
-  tabBarTrack: {
-    position: 'relative',
-    height: 48,
-    backgroundColor: colors.bgBaseElevated,
-    borderRadius: 12,
-    padding: 4,
-  },
-  tabRow: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabText: {
-    fontFamily: fonts.medium,
-    fontSize: 15,
-    color: colors.textSecondary,
-  },
-  tabTextActive: {
-    color: colors.textBase,
-    fontFamily: fonts.semiBold,
-  },
-  tabIndicator: {
-    position: 'absolute',
-    left: 4,
-    top: 4,
-    bottom: 4,
-    backgroundColor: colors.bgWhite,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-  },
-  cardsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  collectionWrap: {
-    marginBottom: 8,
-  },
-  collectionCard: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 24,
-    padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 24,
-    elevation: 3,
-  },
-  collectionTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textBase,
-    marginTop: 12,
-    marginBottom: 2,
-    marginLeft: 2,
-  },
-  collectionCount: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginLeft: 2,
-  },
-  thumbGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: THUMB_GAP,
-  },
-  thumb: {
-    borderRadius: 16,
-    backgroundColor: colors.border3,
-    overflow: 'hidden',
-  },
-  thumbEmpty: {
-    backgroundColor: colors.border1,
-  },
-  loadingWrap: {
-    paddingVertical: 48,
-    alignItems: 'center',
-  },
-  emptyHistory: {
-    paddingVertical: 48,
-    alignItems: 'center',
-  },
-  emptyHistoryText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  emptyHistorySubtext: {
-    textAlign: 'center',
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.textTertiary,
-    marginTop: 4,
-    marginHorizontal: 16,
-  },
-  historyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bgWhite,
-    borderRadius: 20,
-    padding: 12,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  historyThumbWrap: { marginRight: 12 },
-  historyThumb: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: colors.border3,
-    overflow: 'hidden',
-  },
-  historyThumbEmpty: {},
-  historyInfo: {
-    flex: 1,
-    minWidth: 0,
-    marginLeft: 0,
-  },
-  historyTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textBase,
-    marginBottom: 2,
-  },
-  historyCategory: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  historyPrice: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: colors.brand,
-  },
-  historyMenu: { padding: 4 },
-  historyDate: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textTertiary,
-    marginTop: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: colors.bgWhite,
-    borderRadius: 24,
-    padding: 16,
-  },
-  modalTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 20,
-    color: colors.textBase,
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 28,
-  },
-  modalLabel: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: 8,
-  },
-  modalInput: {
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: colors.bgBase,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    fontFamily: fonts.medium,
-    color: colors.textBase,
-    marginBottom: 20,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  modalCancelBtn: {
-    width: '48%',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: colors.bgBase,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 15,
-    color: colors.textBase,
-  },
-  modalCreateBtn: {
-    width: '48%',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: colors.brand,
-    alignItems: 'center',
-  },
-  modalCreateBtnDisabled: { opacity: 0.7 },
-  modalCreateText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 15,
-    color: colors.textWhite,
-  },
-  sheetOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  sheet: {
-    backgroundColor: colors.bgWhite,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border3,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 18,
-    color: colors.textBase,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  sheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-    gap: 12,
-  },
-  sheetRowText: {
-    fontFamily: fonts.medium,
-    fontSize: 16,
-    color: colors.textBase,
-  },
-  sheetRowTextDanger: { color: colors.red },
-});

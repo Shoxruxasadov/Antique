@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect, useState, useMemo } from "react";
 import {
   StyleSheet,
   View,
@@ -16,17 +16,26 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { colors, fonts } from "../../theme";
+import { CrownSimpleIcon, Camera, DotsThreeOutlineVerticalIcon, CaretRight, Trash } from "phosphor-react-native";
+import { useColors, fonts } from "../../theme";
 import { useAppSettingsStore } from "../../stores/useAppSettingsStore";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useExchangeRatesStore } from "../../stores/useExchangeRatesStore";
-import { formatPriceRangeUsd } from "../../lib/currency";
+import { formatPriceUsd } from "../../lib/currency";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
+import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 
 const CARD_COUNT = 6;
 const DELAY_STEP = 70;
 const ANIM_DURATION = 550;
+
+/** Animatsiya birinchi yuklanishda va boshqa tabdan (masalan Collection) Home ga o‘tganida ishlaydi. Modal yopilganda qayta ishlamaydi. */
+let homeScreenHasAnimated = false;
+let homeAnimateOnNextFocus = false;
+
+export function setHomeAnimateOnNextFocus(value) {
+  homeAnimateOnNextFocus = value;
+}
 
 const CURRENCY_FLAGS = {
   USD: "🇺🇸",
@@ -73,6 +82,7 @@ function createCardAnims() {
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const { width } = useWindowDimensions();
   const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
   const rates = useExchangeRatesStore((s) => s.rates);
@@ -84,13 +94,277 @@ export default function HomeScreen({ navigation }) {
   const [lastSnaps, setLastSnaps] = useState([]);
   const [showHistoryOptionsSheet, setShowHistoryOptionsSheet] = useState(false);
   const [selectedSnap, setSelectedSnap] = useState(null);
+  const [proBtnLayout, setProBtnLayout] = useState({ width: 0, height: 0 });
   const cardAnims = useRef(createCardAnims()).current;
-  const hasAnimatedRef = useRef(false);
   const mainStack = navigation.getParent();
   const sheetOverlayOpacity = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(new Animated.Value(Dimensions.get("window").height)).current;
 
   const easeOut = Easing.bezier(0.25, 0.1, 0.25, 1);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.bgBase,
+        },
+        scrollContent: {
+          paddingHorizontal: 16,
+          paddingTop: 12,
+        },
+        header: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 24,
+        },
+        currencyBlock: {
+          flexDirection: "column",
+        },
+        currencyFlagWrap: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
+        },
+        currencyFlag: { fontSize: 24 },
+        currencyCode: {
+          fontFamily: fonts.bold,
+          fontSize: 18,
+          color: colors.textBase,
+        },
+        currencyLabel: {
+          fontFamily: fonts.regular,
+          fontSize: 12,
+          color: colors.textSecondary,
+        },
+        proBtn: {
+          position: "relative",
+          overflow: "hidden",
+          paddingVertical: 6.5,
+          paddingHorizontal: 14,
+          borderRadius: 20,
+        },
+        proBtnContent: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+        },
+        proBtnText: {
+          fontFamily: fonts.bold,
+          fontSize: 15,
+          color: colors.textWhite,
+          lineHeight: 24,
+        },
+        mainCard: {
+          backgroundColor: colors.bgWhite,
+          borderRadius: 20,
+          paddingVertical: 28,
+          paddingHorizontal: 24,
+          alignItems: "center",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          elevation: 3,
+        },
+        mainCardIcon: {
+          width: 80,
+          height: 80,
+          marginBottom: 16,
+        },
+        mainCardTitle: {
+          fontFamily: fonts.bold,
+          fontSize: 30,
+          fontWeight: "600",
+          color: colors.textBase,
+          textAlign: "center",
+          marginBottom: 16,
+          paddingHorizontal: 8,
+        },
+        identifyBtn: {
+          width: "100%",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+          height: 56,
+          backgroundColor: colors.bgInverted,
+          paddingVertical: 14,
+          paddingHorizontal: 24,
+          borderRadius: 14,
+        },
+        identifyBtnText: {
+          fontFamily: fonts.semiBold,
+          fontSize: 16,
+          color: colors.textInverse,
+        },
+        sectionTitle: {
+          fontFamily: fonts.bold,
+          fontSize: 18,
+          color: colors.textBase,
+          marginBottom: 12,
+          marginTop: 20,
+        },
+        snapRowScroll: {
+          marginHorizontal: -16,
+        },
+        snapRowContent: {
+          paddingHorizontal: 16,
+          paddingBottom: 8,
+        },
+        snapCard: {
+          marginRight: 12,
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: colors.bgWhite,
+          borderRadius: 20,
+          padding: 12,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 4,
+          elevation: 2,
+        },
+        snapThumbWrap: { marginRight: 12 },
+        snapThumb: {
+          width: 64,
+          height: 64,
+          borderRadius: 12,
+          backgroundColor: colors.border3,
+        },
+        snapThumbEmpty: {},
+        snapInfo: { flex: 1, minWidth: 0 },
+        snapTitle: {
+          fontFamily: fonts.semiBold,
+          fontSize: 16,
+          color: colors.textBase,
+          marginBottom: 2,
+        },
+        snapCategory: {
+          fontFamily: fonts.regular,
+          fontSize: 13,
+          color: colors.textSecondary,
+          marginBottom: 2,
+        },
+        snapPrice: {
+          fontFamily: fonts.medium,
+          fontSize: 14,
+          color: colors.brand,
+        },
+        snapDots: { padding: 4 },
+        seeAllBtn: {
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.bgWhite,
+          borderRadius: 20,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 4,
+          elevation: 2,
+        },
+        seeAllCircle: {
+          width: 36,
+          height: 36,
+          borderRadius: 20,
+          borderWidth: 1.5,
+          borderColor: colors.brand,
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 8,
+        },
+        seeAllText: {
+          fontFamily: fonts.medium,
+          fontSize: 14,
+          color: colors.brand,
+        },
+        blogCard: {
+          marginRight: 12,
+          flexDirection: "column",
+          backgroundColor: colors.bgWhite,
+          borderRadius: 24,
+          overflow: "hidden",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 4,
+          elevation: 2,
+        },
+        blogCardImageWrap: {
+          width: "100%",
+          aspectRatio: 1.35,
+          overflow: "hidden",
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+        },
+        blogCardImage: {
+          width: "100%",
+          height: "100%",
+          backgroundColor: colors.border3,
+        },
+        blogThumbEmpty: {},
+        blogCardBody: {
+          paddingHorizontal: 18,
+          paddingTop: 14,
+          paddingBottom: 18,
+        },
+        blogCardTitle: {
+          fontFamily: fonts.semiBold,
+          fontSize: 16,
+          color: colors.textBase,
+          marginBottom: 6,
+          lineHeight: 22,
+        },
+        blogCardMeta: {
+          fontFamily: fonts.regular,
+          fontSize: 13,
+          color: colors.textSecondary,
+        },
+        sheetOverlay: {
+          backgroundColor: "rgba(0,0,0,0.4)",
+        },
+        sheet: {
+          backgroundColor: colors.bgWhite,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingHorizontal: 24,
+          paddingTop: 12,
+        },
+        sheetHandle: {
+          width: 40,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border3,
+          alignSelf: "center",
+          marginBottom: 20,
+        },
+        sheetTitle: {
+          fontFamily: fonts.semiBold,
+          fontSize: 18,
+          color: colors.textBase,
+          marginBottom: 16,
+          textAlign: "center",
+        },
+        sheetRow: {
+          flexDirection: "row",
+          alignItems: "center",
+          paddingVertical: 14,
+          paddingHorizontal: 4,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border1,
+          gap: 12,
+        },
+        sheetRowText: {
+          fontFamily: fonts.medium,
+          fontSize: 16,
+          color: colors.textBase,
+        },
+        sheetRowTextDanger: { color: colors.red },
+      }),
+    [colors]
+  );
 
   useEffect(() => {
     if (!showHistoryOptionsSheet) return;
@@ -162,31 +436,47 @@ export default function HomeScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      if (hasAnimatedRef.current) return;
-      hasAnimatedRef.current = true;
-      cardAnims.forEach((anim) => {
-        anim.opacity.setValue(0);
-        anim.translateY.setValue(36);
-      });
-      cardAnims.forEach((anim, i) => {
-        Animated.sequence([
-          Animated.delay(i * DELAY_STEP),
-          Animated.parallel([
-            Animated.timing(anim.opacity, {
-              toValue: 1,
-              duration: ANIM_DURATION,
-              easing: easeOut,
-              useNativeDriver: true,
-            }),
-            Animated.timing(anim.translateY, {
-              toValue: 0,
-              duration: ANIM_DURATION,
-              easing: easeOut,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]).start();
-      });
+      const runAnimation = () => {
+        cardAnims.forEach((anim) => {
+          anim.opacity.setValue(0);
+          anim.translateY.setValue(36);
+        });
+        cardAnims.forEach((anim, i) => {
+          Animated.sequence([
+            Animated.delay(i * DELAY_STEP),
+            Animated.parallel([
+              Animated.timing(anim.opacity, {
+                toValue: 1,
+                duration: ANIM_DURATION,
+                easing: easeOut,
+                useNativeDriver: true,
+              }),
+              Animated.timing(anim.translateY, {
+                toValue: 0,
+                duration: ANIM_DURATION,
+                easing: easeOut,
+                useNativeDriver: true,
+              }),
+            ]),
+          ]).start();
+        });
+      };
+
+      if (homeAnimateOnNextFocus) {
+        homeAnimateOnNextFocus = false;
+        homeScreenHasAnimated = true;
+        runAnimation();
+        return;
+      }
+      if (homeScreenHasAnimated) {
+        cardAnims.forEach((anim) => {
+          anim.opacity.setValue(1);
+          anim.translateY.setValue(0);
+        });
+        return;
+      }
+      homeScreenHasAnimated = true;
+      runAnimation();
     }, [cardAnims, easeOut]),
   );
 
@@ -203,7 +493,14 @@ export default function HomeScreen({ navigation }) {
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(3);
-        setLastSnaps(data ?? []);
+        const sorted = (data ?? []).slice().sort((a, b) => {
+          const ca = a.created_at ?? '';
+          const cb = b.created_at ?? '';
+          const byTime = cb.localeCompare(ca);
+          if (byTime !== 0) return byTime;
+          return String(b.id ?? '').localeCompare(String(a.id ?? ''));
+        });
+        setLastSnaps(sorted);
       } catch (_) {
         setLastSnaps([]);
       }
@@ -216,7 +513,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       <ScrollView
         contentContainerStyle={[
@@ -233,21 +530,53 @@ export default function HomeScreen({ navigation }) {
           }}
         >
           <View style={styles.header}>
-            <View style={styles.currencyBlock}>
-                <View style={styles.currencyFlagWrap}>
-                  <Text style={styles.currencyFlag}>
-                    {CURRENCY_FLAGS[preferredCurrency] || "💱"}
-                  </Text>
-                  <Text style={styles.currencyCode}>{preferredCurrency}</Text>
-                </View>
-                <Text style={styles.currencyLabel}>Preferred Currency</Text>
-            </View>
+            <Pressable
+              style={styles.currencyBlock}
+              onPress={() => mainStack?.navigate("PreferredCurrency")}
+            >
+              <View style={styles.currencyFlagWrap}>
+                <Text style={styles.currencyFlag}>
+                  {CURRENCY_FLAGS[preferredCurrency] || "💱"}
+                </Text>
+                <Text style={styles.currencyCode}>{preferredCurrency}</Text>
+              </View>
+              <Text style={styles.currencyLabel}>Preferred Currency</Text>
+            </Pressable>
             <Pressable
               style={styles.proBtn}
               onPress={() => mainStack?.navigate("Pro")}
+              onLayout={(e) => {
+                const { width, height } = e.nativeEvent.layout;
+                setProBtnLayout((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+              }}
             >
-              <Ionicons name="diamond" size={18} color={colors.textWhite} />
-              <Text style={styles.proBtnText}>PRO</Text>
+              {proBtnLayout.width > 0 && proBtnLayout.height > 0 && (
+                <Svg
+                  style={StyleSheet.absoluteFill}
+                  width={proBtnLayout.width}
+                  height={proBtnLayout.height}
+                > 
+                  <Defs>
+                    <LinearGradient id="proBtnGrad" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0" stopColor="#D4AF37" />
+                      <Stop offset="1" stopColor="#A98A49" />
+                    </LinearGradient>
+                  </Defs>
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={proBtnLayout.width}
+                    height={proBtnLayout.height}
+                    rx={20}
+                    ry={20}
+                    fill="url(#proBtnGrad)"
+                  />
+                </Svg>
+              )}
+              <View style={styles.proBtnContent}>
+                <CrownSimpleIcon size={20} color={colors.textWhite} weight="fill" />
+                <Text style={styles.proBtnText}>PRO</Text>
+              </View>
             </Pressable>
           </View>
         </Animated.View>
@@ -261,7 +590,7 @@ export default function HomeScreen({ navigation }) {
         >
           <View style={styles.mainCard}>
             <Image
-              source={require("../../assets/icon.png")}
+              source={require("../../assets/home_image.png")}
               style={styles.mainCardIcon}
               resizeMode="contain"
             />
@@ -272,7 +601,7 @@ export default function HomeScreen({ navigation }) {
               style={styles.identifyBtn}
               onPress={() => mainStack?.navigate("Identify")}
             >
-              <Ionicons name="camera" size={22} color={colors.textWhite} />
+              <Camera size={22} color={colors.textInverse} />
               <Text style={styles.identifyBtnText}>Identify Now</Text>
             </Pressable>
           </View>
@@ -298,10 +627,9 @@ export default function HomeScreen({ navigation }) {
                 : snap.payload?.category || "Antique";
               const min = snap.payload?.market_value_min;
               const max = snap.payload?.market_value_max;
-              const priceStr =
-                min != null && max != null
-                  ? formatPriceRangeUsd(min, max, displayCurrency, rate)
-                  : "";
+              const est = snap.payload?.estimated_market_value_usd;
+              const currentValue = (min != null && Number(min) > 0) ? Number(min) : (max != null && Number(max) > 0) ? Number(max) : (est != null ? Number(est) : null);
+              const priceStr = currentValue != null && currentValue > 0 ? formatPriceUsd(currentValue, displayCurrency, rate) : "";
               return (
                 <Pressable
                   key={snap.id}
@@ -348,10 +676,10 @@ export default function HomeScreen({ navigation }) {
                     }}
                     hitSlop={12}
                   >
-                    <Ionicons
-                      name="ellipsis-vertical"
+                    <DotsThreeOutlineVerticalIcon
                       size={20}
                       color={colors.textSecondary}
+                      weight="fill"
                     />
                   </Pressable>
                 </Pressable>
@@ -368,7 +696,7 @@ export default function HomeScreen({ navigation }) {
               }}
             >
               <View style={styles.seeAllCircle}>
-                <Ionicons name="arrow-forward" size={22} color={colors.brand} />
+                <CaretRight size={22} color={colors.brand} />
               </View>
               <Text style={styles.seeAllText}>See All</Text>
             </Pressable>
@@ -414,7 +742,7 @@ export default function HomeScreen({ navigation }) {
               onPress={() => mainStack?.navigate("AllPosts")}
             >
               <View style={styles.seeAllCircle}>
-                <Ionicons name="arrow-forward" size={22} color={colors.brand} />
+                <CaretRight size={22} color={colors.brand} />
               </View>
               <Text style={styles.seeAllText}>See All</Text>
             </Pressable>
@@ -445,7 +773,7 @@ export default function HomeScreen({ navigation }) {
               <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle}>Options</Text>
               <Pressable style={styles.sheetRow} onPress={handleDeleteSnap}>
-                <Ionicons name="trash-outline" size={22} color={colors.red} />
+                <Trash size={22} color={colors.red} />
                 <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Delete</Text>
               </Pressable>
             </Pressable>
@@ -455,261 +783,3 @@ export default function HomeScreen({ navigation }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.brandLight,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  currencyBlock: {
-    flexDirection: "column",
-  },
-  currencyFlagWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  currencyFlag: { fontSize: 24 },
-  currencyCode: {
-    fontFamily: fonts.bold,
-    fontSize: 18,
-    color: colors.textBase,
-  },
-  currencyLabel: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  proBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.brand,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  proBtnText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 14,
-    color: colors.textWhite,
-  },
-  mainCard: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 20,
-    paddingVertical: 28,
-    paddingHorizontal: 24,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  mainCardIcon: {
-    width: 80,
-    height: 80,
-    marginBottom: 16,
-  },
-  mainCardTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 30,
-    fontWeight: "600",
-    color: colors.textBase,
-    textAlign: "center",
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-  identifyBtn: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    height: 56,
-    backgroundColor: colors.bgInverted,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-  },
-  identifyBtnText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textWhite,
-  },
-  sectionTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 18,
-    color: colors.textBase,
-    marginBottom: 12,
-    marginTop: 20,
-  },
-  snapRowScroll: { 
-    marginHorizontal: -16,
-  },
-  snapRowContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  snapCard: {
-    marginRight: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.bgWhite,
-    borderRadius: 20,
-    padding: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  snapThumbWrap: { marginRight: 12 },
-  snapThumb: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: colors.border3,
-  },
-  snapThumbEmpty: {},
-  snapInfo: { flex: 1, minWidth: 0 },
-  snapTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textBase,
-    marginBottom: 2,
-  },
-  snapCategory: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  snapPrice: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: colors.brand,
-  },
-  snapDots: { padding: 4 },
-  seeAllBtn: {
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.bgWhite,
-    borderRadius: 20,
-    // paddingVertical: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    // marginVertical: 20,
-  },
-  seeAllCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: colors.brand,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  seeAllText: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: colors.brand,
-  },
-  blogCard: {
-    marginRight: 12,
-    flexDirection: "column",
-    backgroundColor: colors.bgWhite,
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  blogCardImageWrap: {
-    width: "100%",
-    aspectRatio: 1.35,
-    overflow: "hidden",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  blogCardImage: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: colors.border3,
-  },
-  blogThumbEmpty: {},
-  blogCardBody: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 18,
-  },
-  blogCardTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textBase,
-    marginBottom: 6,
-    lineHeight: 22,
-  },
-  blogCardMeta: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  sheetOverlay: {
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  sheet: {
-    backgroundColor: colors.bgWhite,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border3,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 18,
-    color: colors.textBase,
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  sheetRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-    gap: 12,
-  },
-  sheetRowText: {
-    fontFamily: fonts.medium,
-    fontSize: 16,
-    color: colors.textBase,
-  },
-  sheetRowTextDanger: { color: colors.red },
-});

@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { X, Check } from 'phosphor-react-native';
+import { openTermsOfUse, openPrivacyPolicy } from '../../lib/legalLinks';
 import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
 import { fonts } from '../../theme';
 
@@ -87,7 +88,7 @@ export default function ProScreen({ navigation }) {
       <View style={[styles.headerImageWrap, { height: HEADER_IMAGE_HEIGHT }]}>
         <Image
           source={require('../../assets/PRO.png')}
-          style={[styles.headerImage, { top: 0, height: HEADER_IMAGE_HEIGHT + insets.top * 4 }]}
+          style={[styles.headerImage, { top: 0, height: HEADER_IMAGE_HEIGHT }]}
           resizeMode="cover"
         />
         <View style={[styles.gradientOverlay, { bottom: 0, height: GRADIENT_HEIGHT }]} pointerEvents="none">
@@ -130,21 +131,19 @@ export default function ProScreen({ navigation }) {
           </Animated.View>
           <Animated.View style={[styles.closeBtnAnimated, { opacity: closeOpacity }]} pointerEvents={showClose ? 'box-none' : 'none'}>
             <Pressable style={styles.closeBtn} onPress={() => navigation.goBack()}>
-              <Ionicons name="close-sharp" size={28} color={PRO_DARK.text} />
+              <X size={24} color={PRO_DARK.text} weight="bold" />
             </Pressable>
           </Animated.View>
         </View>
       </View>
 
       <View style={[styles.scrollContent, { transform: [{ translateY: -10 }] }]}>
-        <Text style={styles.headline}>Upgrade to PRO</Text>
-        <Text style={styles.description}>
-          Collect cards and enjoy exclusive features and benefits
-        </Text>
+        <Text style={styles.headline}>Unlock Premium</Text>
+        <Text style={styles.description}>Collect cards and enjoy exclusive features and benefits</Text>
 
         {FEATURES.map((item, i) => (
           <View key={i} style={styles.featureRow}>
-            <Ionicons name="checkmark" size={24} color={PRO_DARK.text} />
+            <Check size={24} color={PRO_DARK.text} />
             <Text style={styles.featureText}>{item}</Text>
           </View>
         ))}
@@ -156,7 +155,7 @@ export default function ProScreen({ navigation }) {
           >
             <View style={[styles.planCardBadge, plan === 'monthly' && styles.planCardBadgeSelected]}>
               {plan === 'monthly' ? (
-                <Ionicons name="checkmark-sharp" size={14} color={PRO_DARK.backgroundColor} />
+                <Check size={14} color={PRO_DARK.bg} weight="bold" />
               ) : null}
             </View>
             <Text style={styles.planTitle}>Monthly</Text>
@@ -169,7 +168,7 @@ export default function ProScreen({ navigation }) {
           >
             <View style={[styles.planCardBadge, plan === 'annual' && styles.planCardBadgeSelected]}>
               {plan === 'annual' ? (
-                <Ionicons name="checkmark-sharp" size={14} color={PRO_DARK.backgroundColor} />
+                <Check size={14} color={PRO_DARK.bg} weight="bold" />
               ) : null}
             </View>
             <Text style={styles.planTitle}>Annual</Text>
@@ -184,13 +183,13 @@ export default function ProScreen({ navigation }) {
         </Pressable>
 
         <View style={styles.footer}>
-          <Pressable onPress={() => {}}>
-            <Text style={styles.footerLink}>Terms of Service</Text>
+          <Pressable onPress={openTermsOfUse}>
+            <Text style={styles.footerLink}>Terms of Use</Text>
           </Pressable>
           <Pressable onPress={() => {}}>
             <Text style={styles.footerLink}>Restore</Text>
           </Pressable>
-          <Pressable onPress={() => {}}>
+          <Pressable onPress={openPrivacyPolicy}>
             <Text style={styles.footerLink}>Privacy Policy</Text>
           </Pressable>
         </View>

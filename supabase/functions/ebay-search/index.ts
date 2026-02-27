@@ -1,7 +1,7 @@
 // Supabase Edge Function: eBay Browse API orqali qidiruv (narx, rasm, link).
-// Kalitlar: (1) EBAY_APP_ID + EBAY_CERT_ID env, YOKI (2) get-api-keys (x-internal-secret header bilan).
+// Kalitlar faqat get-api-keys dan (SUPABASE_URL avtomatik). Hech qanday secret kerak emas.
 // Ixtiyoriy: EBAY_SANDBOX=true
-import "jsr:@supabase/functions-js/edge_runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SANDBOX = Deno.env.get("EBAY_SANDBOX") !== "false";
 const BASE = SANDBOX
@@ -14,8 +14,10 @@ interface TokenResponse {
 }
 
 interface ApiKeysResponse {
+  geminiApiKey?: string;
   ebayAppId?: string;
   ebayCertId?: string;
+  ebayDevId?: string;
   success?: boolean;
 }
 
@@ -34,29 +36,21 @@ interface SearchResponse {
 }
 
 async function getEbayCredentials(): Promise<{ appId: string; certId: string }> {
-  let appId = Deno.env.get("EBAY_APP_ID");
-  let certId = Deno.env.get("EBAY_CERT_ID");
-  if (appId && certId) return { appId, certId }
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const internalSecret = Deno.env.get("INTERNAL_SECRET");
-  if (supabaseUrl && internalSecret) {
-    try {
-      const r = await fetch(`${supabaseUrl}/functions/v1/get-api-keys`, {
-        headers: { "x-internal-secret": internalSecret },
-      });
-      if (r.ok) {
-        const data = (await r.json()) as ApiKeysResponse;
-        if (data?.success && data?.ebayAppId && data?.ebayCertId) {
-          return { appId: data.ebayAppId, certId: data.ebayCertId };
-        }
-      }
-    } catch (e) {
-      console.warn("get-api-keys fetch failed:", e);
-    }
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl) throw new Error("SUPABASE_URL not set");
+  const headers: Record<string, string> = {};
+  if (anonKey) headers["Authorization"] = `Bearer ${anonKey}`;
+  const r = await fetch(`${supabaseUrl}/functions/v1/get-api-keys`, { headers });
+  if (!r.ok) {
+    const body = await r.text();
+    throw new Error(`get-api-keys failed: ${r.status} ${body}`);
   }
-  throw new Error(
-    "Set EBAY_APP_ID + EBAY_CERT_ID in secrets, or SUPABASE_URL + INTERNAL_SECRET and protect get-api-keys with x-internal-secret"
-  );
+  const data = (await r.json()) as ApiKeysResponse;
+  if (!data?.success || !data?.ebayAppId || !data?.ebayCertId) {
+    throw new Error("get-api-keys did not return ebayAppId/ebayCertId");
+  }
+  return { appId: data.ebayAppId, certId: data.ebayCertId };
 }
 
 async function getEbayToken(): Promise<string> {
@@ -134,12 +128,22 @@ Deno.serve(async (req: Request) => {
     }
     const market_value_min = prices.length ? Math.min(...prices) : 0;
     const market_value_max = prices.length ? Math.max(...prices) : 0;
+    const ebay_items = items
+      .filter((it) => it.itemWebUrl)
+      .map((it) => ({
+        title: it.title ?? "",
+        price: it.price?.value ?? null,
+        currency: it.price?.currency ?? "USD",
+        itemWebUrl: it.itemWebUrl ?? "",
+        imageUrl: it.image?.imageUrl ?? it.additionalImages?.[0]?.imageUrl ?? null,
+      }));
     return json({
       market_value_min,
       market_value_max,
       avg_growth_percentage: 0.05,
       image_urls,
       ebay_links,
+      ebay_items,
     });
   } catch (e) {
     console.error("ebay-search error:", e);

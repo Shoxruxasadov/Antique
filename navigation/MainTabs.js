@@ -1,14 +1,14 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import HomeScreen from '../screens/main/HomeScreen';
+import { SquaresFour, FolderSimpleIcon, User } from 'phosphor-react-native';
+import HomeScreen, { setHomeAnimateOnNextFocus } from '../screens/main/HomeScreen';
 import CollectionScreen from '../screens/main/CollectionScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import TabBarBackground from '../components/TabBarBackground';
 import CenterTabButton from './CenterTabButton';
 import AssistantTabButton from './AssistantTabButton';
-import { colors, fonts } from '../theme';
+import { useColors, fonts } from '../theme';
 import { useAppSettingsStore } from '../stores/useAppSettingsStore';
 import { triggerHaptic } from '../lib/haptics';
 
@@ -21,6 +21,7 @@ function PlaceholderScreen() {
 }
 
 export default function MainTabs() {
+  const colors = useColors();
   const vibration = useAppSettingsStore((s) => s.vibration);
 
   return (
@@ -31,11 +32,10 @@ export default function MainTabs() {
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabBarLabel,
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarContentContainerStyle: styles.tabBarContentContainer,
         tabBarBackground: () => <TabBarBackground />,
         tabBarShowLabel: true,
-        screenListeners: {
-          tabPress: () => triggerHaptic(vibration),
-        },
       }}
     >
       <Tab.Screen
@@ -43,9 +43,15 @@ export default function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons name="grid" size={TAB_ICON_SIZE} color={color} />
+            <SquaresFour size={TAB_ICON_SIZE} color={color} weight='fill'  />
           ),
           tabBarLabel: 'Home',
+          listeners: ({ navigation }) => ({
+            tabPress: () => {
+              triggerHaptic(vibration);
+              setHomeAnimateOnNextFocus(true);
+            },
+          }),
         }}
       />
       <Tab.Screen
@@ -53,9 +59,12 @@ export default function MainTabs() {
         component={CollectionScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons name="folder-open" size={TAB_ICON_SIZE} color={color} />
+            <FolderSimpleIcon size={TAB_ICON_SIZE} color={color} weight='fill'  />
           ),
           tabBarLabel: 'Collections',
+          listeners: () => ({
+            tabPress: () => triggerHaptic(vibration),
+          }),
         }}
       />
       <Tab.Screen
@@ -72,7 +81,7 @@ export default function MainTabs() {
         component={PlaceholderScreen}
         options={{
           tabBarButton: (props) => <AssistantTabButton {...props} />,
-          tabBarLabel: 'Ask expert',
+          tabBarLabel: 'Ask Expert',
         }}
       />
       <Tab.Screen
@@ -80,9 +89,12 @@ export default function MainTabs() {
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons name="person" size={TAB_ICON_SIZE} color={color} />
+            <User size={TAB_ICON_SIZE} color={color} weight='fill' />
           ),
           tabBarLabel: 'Profile',
+          listeners: () => ({
+            tabPress: () => triggerHaptic(vibration),
+          }),
         }}
       />
     </Tab.Navigator>
@@ -98,6 +110,8 @@ const styles = StyleSheet.create({
     height: 117,
     borderTopWidth: 0,
     paddingTop: 26,
+    paddingHorizontal: 0,
+    marginHorizontal: 0,
     zIndex: 100,
     elevation: 100,
     backgroundColor: 'transparent',
@@ -106,5 +120,12 @@ const styles = StyleSheet.create({
   tabBarLabel: {
     fontSize: 12,
     fontFamily: fonts.semiBold,
+  },
+  tabBarItem: {
+    paddingHorizontal: 0,
+  },
+  tabBarContentContainer: {
+    paddingHorizontal: 0,
+    marginHorizontal: 0,
   },
 });

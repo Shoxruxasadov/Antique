@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   StyleSheet,
   View,
@@ -13,13 +13,23 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Camera,
+  X,
+  Lightning,
+  CameraRotate,
+  Images,
+  Info,
+  Warning,
+  Check,
+} from "phosphor-react-native";
 import { BlurView } from "expo-blur";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
-import { colors, fonts } from "../../theme";
+import * as ImageManipulator from "expo-image-manipulator";
+import { useColors, fonts } from "../../theme";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useAppSettingsStore } from "../../stores/useAppSettingsStore";
 import { triggerHaptic } from "../../lib/haptics";
@@ -53,28 +63,50 @@ function mimeFromUri(uri) {
   return "image/jpeg";
 }
 
-async function ensurePublicImageUrl(imageUri, base64, userId) {
+/** Snap uchun max o‘lcham (4K va undan kattalarini qisqartiradi) */
+const MAX_SNAP_WIDTH = 1200;
+const SNAP_JPEG_QUALITY = 0.85;
+
+/**
+ * Rasmni 1200px kenglikgacha qisqartirib, JPEG siqib, keyin yuklash.
+ * 4K va katta rasmlar appda ochilishini yengillashtiradi.
+ */
+async function resizeAndUploadSnap(imageUri, userId) {
   if (!userId || !imageUri) return imageUri;
-  if (!isLocalFileUri(imageUri)) return imageUri;
   const snapId = `snap_${Date.now()}`;
-  let data = base64 || "";
-  const contentType = mimeFromUri(imageUri);
-  if (!data && imageUri) {
-    try {
-      data = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-    } catch (e) {
-      console.warn("Read local image failed:", e?.message);
-      return imageUri;
-    }
+  try {
+    const resized = await ImageManipulator.manipulateAsync(
+      imageUri,
+      [{ resize: { width: MAX_SNAP_WIDTH } }],
+      { compress: SNAP_JPEG_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    const data = await FileSystem.readAsStringAsync(resized.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const uploaded = await uploadSnapImage(
+      userId,
+      snapId,
+      data,
+      "image/jpeg"
+    );
+    return uploaded || null;
+  } catch (e) {
+    console.warn("Snap resize/upload failed:", e?.message);
+    return null;
   }
-  const uploaded = await uploadSnapImage(userId, snapId, data, contentType);
-  return uploaded || imageUri;
+}
+
+/** Faqat Supabase Storage public URL qaytaradi; local file hech qachon DB ga yozilmasin */
+async function ensurePublicImageUrl(imageUri, base64, userId) {
+  if (!userId || !imageUri) return null;
+  if (!isLocalFileUri(imageUri)) return imageUri;
+  const uploaded = await resizeAndUploadSnap(imageUri, userId);
+  return isLocalFileUri(uploaded) ? null : uploaded;
 }
 
 export default function ScannerScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
   const user = useAuthStore((s) => s.user);
   const vibration = useAppSettingsStore((s) => s.vibration);
@@ -106,6 +138,52 @@ export default function ScannerScreen({ navigation }) {
   const step3CheckScale = useRef(new Animated.Value(0)).current;
   const prevCompletedSteps = useRef(0);
   const modalOpacity = useRef(new Animated.Value(0)).current;
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: "#000", position: "relative" },
+        center: { justifyContent: "center", alignItems: "center" },
+        permissionBtn: { marginTop: 16, padding: 16, borderRadius: 30, backgroundColor: colors.brand },
+        header: { position: "absolute", left: 0, right: 0, top: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 10 },
+        headerBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(80, 80, 80, 0.5)", alignItems: "center", justifyContent: "center" },
+        headerRight: { flexDirection: "row", alignItems: "center" },
+        cameraWrapper: { flex: 1, overflow: "hidden", alignItems: "center", marginBottom: 88 },
+        cameraBox: { borderRadius: CAMERA_BORDER_RADIUS, overflow: "hidden", position: "relative" },
+        scanFrame: { position: "absolute", zIndex: 5 },
+        corner: { position: "absolute", width: SCAN_CORNER_SIZE, height: SCAN_CORNER_SIZE, borderColor: "#FFFFFF" },
+        cornerTopLeft: { top: 0, left: 0, borderTopWidth: SCAN_BORDER_WIDTH, borderLeftWidth: SCAN_BORDER_WIDTH, borderTopLeftRadius: 12 },
+        cornerTopRight: { top: 0, right: 0, borderTopWidth: SCAN_BORDER_WIDTH, borderRightWidth: SCAN_BORDER_WIDTH, borderTopRightRadius: 12 },
+        cornerBottomLeft: { bottom: 0, left: 0, borderBottomWidth: SCAN_BORDER_WIDTH, borderLeftWidth: SCAN_BORDER_WIDTH, borderBottomLeftRadius: 12 },
+        cornerBottomRight: { bottom: 0, right: 0, borderBottomWidth: SCAN_BORDER_WIDTH, borderRightWidth: SCAN_BORDER_WIDTH, borderBottomRightRadius: 12 },
+        bottomControls: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", justifyContent: "space-around", alignItems: "center", paddingHorizontal: 32, zIndex: 10 },
+        galleryButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(80, 80, 80, 0.5)", alignItems: "center", justifyContent: "center", overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
+        galleryButtonImage: { width: "100%", height: "100%", borderRadius: 25 },
+        captureButton: { width: 76, height: 76, borderRadius: 38, backgroundColor: "rgba(80, 80, 80, 0.5)", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+        captureButtonInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: "rgba(255, 255, 255, 0.95)" },
+        infoButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(80, 80, 80, 0.5)", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
+        modalFullScreen: { flex: 1, width: "100%" },
+        modalBg: { ...StyleSheet.absoluteFillObject },
+        modalBlur: { ...StyleSheet.absoluteFillObject },
+        modalOverlay: { ...StyleSheet.absoluteFillObject },
+        modalContent: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 24 },
+        scanCard: { width: "80%", maxWidth: 340, overflow: "hidden", alignItems: "center" },
+        scanCardImage: { width: "100%", aspectRatio: 1, borderRadius: 40, borderWidth: 6, borderColor: "#ffffff" },
+        scanningText: { marginTop: 24, fontSize: 22, fontFamily: fonts.bold, color: colors.textWhite },
+        scanStepsWrap: { width: "100%", maxWidth: 340, marginTop: 16, alignItems: "flex-start" },
+        stepRow: { flexDirection: "row", alignItems: "center", marginTop: 14, alignSelf: "stretch" },
+        checkCircle: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.35)", alignItems: "center", justifyContent: "center", marginRight: 12 },
+        checkCircleDone: { backgroundColor: colors.green },
+        stepText: { fontSize: 15, fontFamily: fonts.regular, color: colors.textWhite, flex: 1 },
+        errorCard: { backgroundColor: colors.bgWhite, borderRadius: 20, padding: 24, alignItems: "center", maxWidth: 320 },
+        errorText: { fontFamily: fonts.regular, fontSize: 16, color: colors.textBase, textAlign: "center" },
+        notAntiqueCard: { backgroundColor: colors.bgWhite, borderRadius: 20, padding: 24, alignItems: "center", marginHorizontal: 24, maxWidth: 320 },
+        notAntiqueTitle: { fontFamily: fonts.semiBold, fontSize: 20, color: colors.textBase, marginTop: 16 },
+        notAntiqueReason: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, textAlign: "center", marginTop: 8, lineHeight: 22 },
+        backHint: { color: colors.brand, marginTop: 16, fontSize: 16 },
+      }),
+    [colors]
+  );
 
   const loadLastPhoto = useCallback(async () => {
     try {
@@ -264,6 +342,7 @@ export default function ScannerScreen({ navigation }) {
           avg_growth_percentage,
           image_urls: ebayImageUrls,
           ebay_links: ebayLinks = [],
+          ebay_items: ebayItems = [],
         } = await fetchMarketPricesFromEbay(geminiResult.search_keywords || []);
         if (cancelled) return;
         setCompletedSteps(2);
@@ -285,18 +364,16 @@ export default function ScannerScreen({ navigation }) {
             userId,
           );
         }
+        if (isLocalFileUri(scanImageUrl)) scanImageUrl = null;
 
-        const antiqueImageUrls =
-          Array.isArray(ebayImageUrls) && ebayImageUrls.length > 0
-            ? ebayImageUrls
-            : [scanImageUrl];
-        const snapDisplayImageUrl = antiqueImageUrls[0] || scanImageUrl;
+        // Faqat Supabase Storage URL; file:// hech qachon antiques/snap_history ga yozilmasin
+        const snapDisplayImageUrl = scanImageUrl;
 
         const antiqueRow = {
           user_id: userId,
           name: geminiResult.name || "Unknown Antique",
           description: geminiResult.description || "",
-          image_url: antiqueImageUrls,
+          image_url: scanImageUrl || null,
           origin_country: geminiResult.origin_country || "Unknown",
           period_start_year: Number(geminiResult.period_start_year) || 1800,
           period_end_year: Number(geminiResult.period_end_year) || 1900,
@@ -328,8 +405,20 @@ export default function ScannerScreen({ navigation }) {
             : ["Antique"],
           specification: {
             ...(geminiResult.specification ?? {}),
+            ...(geminiResult.estimated_market_value_usd != null
+              ? { estimated_market_value_usd: Number(geminiResult.estimated_market_value_usd) }
+              : {}),
+            ...(geminiResult.estimated_market_value_low_usd != null
+              ? { estimated_market_value_low_usd: Number(geminiResult.estimated_market_value_low_usd) }
+              : {}),
+            ...(geminiResult.estimated_market_value_high_usd != null
+              ? { estimated_market_value_high_usd: Number(geminiResult.estimated_market_value_high_usd) }
+              : {}),
             ...(Array.isArray(ebayLinks) && ebayLinks.length > 0
               ? { ebay_links: ebayLinks }
+              : {}),
+            ...(Array.isArray(ebayItems) && ebayItems.length > 0
+              ? { ebay_items: ebayItems }
               : {}),
           },
           origin_provenance: geminiResult.origin_provenance ?? "",
@@ -375,6 +464,9 @@ export default function ScannerScreen({ navigation }) {
           market_value_min,
           market_value_max,
           avg_growth_percentage,
+          ...(geminiResult.estimated_market_value_usd != null
+            ? { estimated_market_value_usd: Number(geminiResult.estimated_market_value_usd) }
+            : {}),
           ...(Array.isArray(ebayLinks) && ebayLinks.length > 0
             ? { ebay_links: ebayLinks }
             : {}),
@@ -454,14 +546,13 @@ export default function ScannerScreen({ navigation }) {
     return (
       <View style={[styles.container, styles.center, { padding: 24 }]}>
         <StatusBar style="light" />
-        <Ionicons
-          name="camera-outline"
+        <Camera
           size={48}
           color={colors.textSecondary}
         />
         {permission.canAskAgain ? (
           <Pressable style={styles.permissionBtn} onPress={requestPermission}>
-            <Ionicons name="camera" size={20} color="#fff" />
+            <Camera size={20} color="#fff" />
           </Pressable>
         ) : null}
       </View>
@@ -490,7 +581,7 @@ export default function ScannerScreen({ navigation }) {
           onPress={() => navigation.goBack()}
           hitSlop={12}
         >
-          <Ionicons name="close" size={24} color="#FFFFFF" />
+          <X size={24} color="#FFFFFF" />
         </Pressable>
         <View style={styles.headerRight}>
           <Pressable
@@ -498,9 +589,9 @@ export default function ScannerScreen({ navigation }) {
             onPress={toggleTorch}
             hitSlop={12}
           >
-            <Ionicons
-              name={enableTorch ? "flash" : "flash-outline"}
+            <Lightning
               size={24}
+              weight={enableTorch ? "fill" : "regular"}
               color="#FFFFFF"
             />
           </Pressable>
@@ -509,7 +600,7 @@ export default function ScannerScreen({ navigation }) {
             onPress={toggleFacing}
             hitSlop={12}
           >
-            <Ionicons name="camera-reverse-outline" size={24} color="#FFFFFF" />
+            <CameraRotate size={24} color="#FFFFFF" />
           </Pressable>
         </View>
       </View>
@@ -583,7 +674,7 @@ export default function ScannerScreen({ navigation }) {
               resizeMode="cover"
             />
           ) : (
-            <Ionicons name="images-outline" size={24} color="#FFFFFF" />
+            <Images size={24} color="#FFFFFF" />
           )}
         </Pressable>
 
@@ -610,8 +701,7 @@ export default function ScannerScreen({ navigation }) {
           style={styles.infoButton}
           onPress={() => navigation.navigate("InfoScanner")}
         >
-          <Ionicons
-            name="information-circle-outline"
+          <Info
             size={28}
             color="#FFFFFF"
           />
@@ -632,8 +722,7 @@ export default function ScannerScreen({ navigation }) {
           <View style={styles.modalContent}>
             {notAntique ? (
               <View style={styles.notAntiqueCard}>
-                <Ionicons
-                  name="warning-outline"
+                <Warning
                   size={48}
                   color={colors.textSecondary}
                 />
@@ -691,7 +780,7 @@ export default function ScannerScreen({ navigation }) {
                         >
                           {done ? (
                             <Animated.View style={{ transform: [{ scale: checkScale }] }}>
-                              <Ionicons name="checkmark" size={18} color="#fff" />
+                              <Check size={18} color="#fff" />
                             </Animated.View>
                           ) : null}
                         </View>
@@ -708,266 +797,3 @@ export default function ScannerScreen({ navigation }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-    position: "relative",
-  },
-  center: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  permissionBtn: {
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 30,
-    backgroundColor: colors.brand,
-  },
-  header: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    zIndex: 10,
-  },
-  headerBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(80, 80, 80, 0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  cameraWrapper: {
-    flex: 1,
-    overflow: "hidden",
-    alignItems: "center",
-    marginBottom: 88,
-  },
-  cameraBox: {
-    borderRadius: CAMERA_BORDER_RADIUS,
-    overflow: "hidden",
-    position: "relative",
-  },
-  scanFrame: {
-    position: "absolute",
-    zIndex: 5,
-  },
-  corner: {
-    position: "absolute",
-    width: SCAN_CORNER_SIZE,
-    height: SCAN_CORNER_SIZE,
-    borderColor: "#FFFFFF",
-  },
-  cornerTopLeft: {
-    top: 0,
-    left: 0,
-    borderTopWidth: SCAN_BORDER_WIDTH,
-    borderLeftWidth: SCAN_BORDER_WIDTH,
-    borderTopLeftRadius: 12,
-  },
-  cornerTopRight: {
-    top: 0,
-    right: 0,
-    borderTopWidth: SCAN_BORDER_WIDTH,
-    borderRightWidth: SCAN_BORDER_WIDTH,
-    borderTopRightRadius: 12,
-  },
-  cornerBottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: SCAN_BORDER_WIDTH,
-    borderLeftWidth: SCAN_BORDER_WIDTH,
-    borderBottomLeftRadius: 12,
-  },
-  cornerBottomRight: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: SCAN_BORDER_WIDTH,
-    borderRightWidth: SCAN_BORDER_WIDTH,
-    borderBottomRightRadius: 12,
-  },
-  bottomControls: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingHorizontal: 32,
-    zIndex: 10,
-  },
-  galleryButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(80, 80, 80, 0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  galleryButtonImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 25,
-  },
-  captureButton: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "rgba(80, 80, 80, 0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  captureButtonInner: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-  },
-  infoButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(80, 80, 80, 0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  modalFullScreen: {
-    flex: 1,
-    width: "100%",
-    // backgroundColor: '#000',
-  },
-  modalBg: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalBlur: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    // backgroundColor: 'rgba(0,0,0,0.25)',
-  },
-  modalContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  scanCard: {
-    width: "80%",
-    maxWidth: 340,
-    overflow: "hidden",
-    alignItems: "center",
-  },
-  scanCardImage: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 40,
-    borderWidth: 6, 
-    borderColor: "#ffffff",
-  },
-  scanningText: {
-    marginTop: 24,
-    fontSize: 22,
-    fontFamily: fonts.bold,
-    color: colors.textWhite,
-  },
-  scanStepsWrap: {
-    width: "100%",
-    maxWidth: 340,
-    marginTop: 16,
-    alignItems: "flex-start",
-  },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 14,
-    alignSelf: "stretch",
-  },
-  checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  checkCircleDone: {
-    backgroundColor: colors.green,
-  },
-  stepText: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
-    color: colors.textWhite,
-    flex: 1,
-  },
-  errorCard: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    maxWidth: 320,
-  },
-  errorText: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.textBase,
-    textAlign: "center",
-  },
-  notAntiqueCard: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    marginHorizontal: 24,
-    maxWidth: 320,
-  },
-  notAntiqueTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 20,
-    color: colors.textBase,
-    marginTop: 16,
-  },
-  notAntiqueReason: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginTop: 8,
-    lineHeight: 22,
-  },
-  backHint: {
-    color: colors.brand,
-    marginTop: 16,
-    fontSize: 16,
-  },
-});

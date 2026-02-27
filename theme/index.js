@@ -1,1 +1,1 @@
-export { colors, lightTheme, darkTheme, fonts } from './colors.js';
+export { colors, lightTheme, darkTheme, fonts, getColors, useColors } from './colors.js';

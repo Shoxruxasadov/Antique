@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -17,16 +17,26 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../theme';
+import {
+  CaretLeft,
+  ListBullets,
+  RowsIcon,
+  DotsThreeOutlineIcon,
+  DotsThreeOutlineVerticalIcon,
+  PencilSimpleIcon,
+  Trash,
+  ArrowsClockwiseIcon,
+} from 'phosphor-react-native';
+import { useColors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
-import { formatPriceRangeUsd, formatPriceUsd } from '../../lib/currency';
+import { formatPriceUsd } from '../../lib/currency';
 
 export default function CollectionDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const user = useAuthStore((s) => s.user);
   const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
   const viewMode = useAppSettingsStore((s) => s.collectionViewMode);
@@ -55,6 +65,72 @@ export default function CollectionDetailScreen({ route, navigation }) {
   const itemSheetTranslateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const changeSpaceSheetOverlay = useRef(new Animated.Value(0)).current;
   const changeSpaceSheetTranslateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.bgBase },
+        header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12 },
+        headerBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+        headerRight: { flexDirection: 'row' },
+        headerTitleWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+        headerTitle: { fontSize: 20, fontFamily: fonts.semiBold, color: colors.textBase, textAlign: 'center', maxWidth: '50%', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+        loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+        emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+        emptyText: { fontSize: 16, fontFamily: fonts.regular, color: colors.textSecondary },
+        scroll: { flex: 1 },
+        scrollContent: { padding: 16, paddingTop: 4 },
+        analyticsCard: { backgroundColor: colors.bgWhite, borderRadius: 16, padding: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, alignItems: 'center' },
+        analyticsLabel: { fontFamily: fonts.regular, fontSize: 15, color: colors.textBase, marginBottom: 6 },
+        analyticsTotal: { fontFamily: fonts.bold, fontSize: 28, color: colors.brand },
+        analyticsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+        analyticsSmallCard: { flex: 1, backgroundColor: colors.bgWhite, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, alignItems: 'center' },
+        analyticsSmallLabel: { fontFamily: fonts.regular, fontSize: 14, color: colors.textBase, marginBottom: 4 },
+        analyticsSmallValue: { fontFamily: fonts.semiBold, fontSize: 18, color: colors.textBase },
+        itemsHeading: { fontFamily: fonts.semiBold, fontSize: 18, color: colors.textBase, marginBottom: 14 },
+        itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgWhite, borderRadius: 20, padding: 12, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 4, elevation: 2 },
+        itemThumbWrap: { marginRight: 12 },
+        itemThumb: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.border3 },
+        itemThumbEmpty: {},
+        itemInfo: { flex: 1, minWidth: 0 },
+        itemName: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase, marginBottom: 2 },
+        itemCategory: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
+        itemPrice: { fontFamily: fonts.medium, fontSize: 14, color: colors.brand },
+        itemMenu: { padding: 4 },
+        listExtendedWrap: { gap: 14 },
+        extendedCard: { width: '100%', backgroundColor: colors.bgWhite, borderRadius: 20, overflow: 'hidden', marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, position: 'relative' },
+        blockCardImageWrap: { width: '100%', aspectRatio: 2, overflow: 'hidden', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 12, paddingTop: 12 },
+        blockCardImage: { width: '100%', height: '100%', backgroundColor: colors.border3, borderRadius: 12 },
+        blockCardBody: { padding: 14, paddingTop: 12 },
+        blockCardTitle: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.textBase, marginBottom: 4 },
+        blockCardCategory: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
+        blockCardPrice: { fontFamily: fonts.medium, fontSize: 14, color: colors.brand },
+        blockCardMenu: { position: 'absolute', top: 20, right: 20, padding: 6, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 16 },
+        sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+        sheet: { backgroundColor: colors.bgWhite, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 24, paddingTop: 12 },
+        sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border3, alignSelf: 'center', marginBottom: 20 },
+        sheetTitle: { fontFamily: fonts.semiBold, fontSize: 18, color: colors.textBase, marginBottom: 16, textAlign: 'center' },
+        sheetRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border1, gap: 12 },
+        sheetRowText: { flex: 1, fontFamily: fonts.medium, fontSize: 16, color: colors.textBase },
+        sheetRowTextDanger: { color: colors.red },
+        sheetRowSubtext: { fontFamily: fonts.regular, fontSize: 13, color: colors.textTertiary },
+        sheetLoading: { paddingVertical: 24, alignItems: 'center' },
+        sheetEmptyText: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, textAlign: 'center', paddingVertical: 16 },
+        sheetScroll: { maxHeight: 320 },
+        modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+        modalCard: { width: '100%', maxWidth: 340, backgroundColor: colors.bgWhite, borderRadius: 16, padding: 24 },
+        modalTitle: { fontFamily: fonts.semiBold, fontSize: 18, color: colors.textBase, marginBottom: 20 },
+        modalLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textBase, marginBottom: 8 },
+        modalInput: { height: 48, borderRadius: 12, backgroundColor: colors.bgBase, paddingHorizontal: 16, fontSize: 16, fontFamily: fonts.regular, color: colors.textBase, marginBottom: 24 },
+        modalActions: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end' },
+        modalCancelBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, backgroundColor: colors.bgBase },
+        modalCancelText: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.textBase },
+        modalCreateBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, backgroundColor: colors.brand, minWidth: 88, alignItems: 'center' },
+        modalCreateBtnDisabled: { opacity: 0.7 },
+        modalCreateText: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.textWhite },
+      }),
+    [colors]
+  );
 
   useEffect(() => {
     if (!showOptionsSheet) return;
@@ -280,7 +356,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
         try {
           const { data, error } = await supabase
             .from('antiques')
-            .select('id, name, category, market_value_min, market_value_max, image_url')
+            .select('id, name, category, market_value_min, market_value_max, image_url, specification')
             .in('id', ids);
           if (error) {
             setItems([]);
@@ -301,23 +377,30 @@ export default function CollectionDetailScreen({ route, navigation }) {
   );
 
 
+  // Har bir item uchun "Current market value" (antique sahifadagi bitta narx) — min > 0 ? min : Gemini estimated
+  const getItemCurrentMarketValue = (it) => {
+    const min = Number(it.market_value_min) || 0;
+    const est = it.specification?.estimated_market_value_usd != null ? Number(it.specification.estimated_market_value_usd) : null;
+    return min > 0 ? min : (est ?? 0);
+  };
+
   const analytics = React.useMemo(() => {
     if (!items.length) return { total: 0, lowest: 0, highest: 0 };
     let total = 0;
     let lowest = Infinity;
     let highest = -Infinity;
     items.forEach((it) => {
-      const min = Number(it.market_value_min);
-      const max = Number(it.market_value_max);
-      const mid = (min + max) / 2;
-      if (!Number.isNaN(mid)) total += mid;
-      if (!Number.isNaN(min) && min < lowest) lowest = min;
-      if (!Number.isNaN(max) && max > highest) highest = max;
+      const current = getItemCurrentMarketValue(it);
+      if (current > 0) {
+        total += current;
+        if (current < lowest) lowest = current;
+        if (current > highest) highest = current;
+      }
     });
     return {
       total: Number.isFinite(total) ? total : 0,
-      lowest: Number.isFinite(lowest) ? lowest : 0,
-      highest: Number.isFinite(highest) ? highest : 0,
+      lowest: Number.isFinite(lowest) && lowest !== Infinity ? lowest : 0,
+      highest: Number.isFinite(highest) && highest !== -Infinity ? highest : 0,
     };
   }, [items]);
 
@@ -375,10 +458,10 @@ export default function CollectionDetailScreen({ route, navigation }) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.textBase} />
+          <CaretLeft size={24} color={colors.textBase} weight="bold" />
         </TouchableOpacity>
         <View style={styles.headerTitleWrap} pointerEvents="none">
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -390,14 +473,14 @@ export default function CollectionDetailScreen({ route, navigation }) {
             style={styles.headerBtn}
             onPress={() => setCollectionViewMode(viewMode === 'list' ? 'listExtended' : 'list')}
           >
-            <Ionicons
-              name={viewMode === 'list' ? 'albums-outline' : 'list-outline'}
-              size={22}
-              color={colors.textBase}
-            />
+            {viewMode === 'list' ? (
+              <ListBullets size={22} color={colors.textBase} weight="bold" />
+            ) : (
+              <RowsIcon size={22} color={colors.brand} weight="bold" />
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerBtn} onPress={() => setShowOptionsSheet(true)}>
-            <Ionicons name="ellipsis-vertical" size={22} color={colors.textBase} />
+            <DotsThreeOutlineIcon size={22} color={colors.textBase} weight="fill" />
           </TouchableOpacity>
         </View>
       </View>
@@ -447,10 +530,10 @@ export default function CollectionDetailScreen({ route, navigation }) {
                 const category = Array.isArray(item.category)
                   ? item.category.join(', ')
                   : (item.category || 'Antique');
-                const priceStr =
-                  item.market_value_min != null && item.market_value_max != null
-                    ? formatPriceRangeUsd(item.market_value_min, item.market_value_max, displayCurrency, rate)
-                    : '';
+                const itemMin = item.market_value_min != null ? Number(item.market_value_min) : 0;
+                const itemEst = item.specification?.estimated_market_value_usd != null ? Number(item.specification.estimated_market_value_usd) : null;
+                const itemCurrent = itemMin > 0 ? itemMin : (itemEst ?? (item.market_value_max != null ? Number(item.market_value_max) : 0));
+                const priceStr = itemCurrent > 0 ? formatPriceUsd(itemCurrent, displayCurrency, rate) : '';
                 return (
                   <Pressable
                     key={item.id}
@@ -459,6 +542,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
                       navigation.navigate('ItemDetails', {
                         antiqueId: item.id,
                         fromCollectionAntiquesIds: antiquesIds,
+                        fromCollectionId: collectionId,
                       })
                     }
                   >
@@ -491,7 +575,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
                       }}
                       hitSlop={8}
                     >
-                      <Ionicons name="ellipsis-vertical" size={18} color={colors.textSecondary} />
+                      <DotsThreeOutlineVerticalIcon size={18} color={colors.textSecondary} weight='fill' />
                     </TouchableOpacity>
                   </Pressable>
                 );
@@ -503,10 +587,10 @@ export default function CollectionDetailScreen({ route, navigation }) {
               const category = Array.isArray(item.category)
                 ? item.category.join(', ')
                 : (item.category || 'Antique');
-              const priceStr =
-                item.market_value_min != null && item.market_value_max != null
-                  ? formatPriceRangeUsd(item.market_value_min, item.market_value_max, displayCurrency, rate)
-                  : '';
+              const itemMin = item.market_value_min != null ? Number(item.market_value_min) : 0;
+              const itemEst = item.specification?.estimated_market_value_usd != null ? Number(item.specification.estimated_market_value_usd) : null;
+              const itemCurrent = itemMin > 0 ? itemMin : (itemEst ?? (item.market_value_max != null ? Number(item.market_value_max) : 0));
+              const priceStr = itemCurrent > 0 ? formatPriceUsd(itemCurrent, displayCurrency, rate) : '';
               return (
                 <Pressable
                   key={item.id}
@@ -515,6 +599,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
                     navigation.navigate('ItemDetails', {
                       antiqueId: item.id,
                       fromCollectionAntiquesIds: antiquesIds,
+                      fromCollectionId: collectionId,
                     })
                   }
                 >
@@ -547,7 +632,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
                     }}
                     hitSlop={12}
                   >
-                    <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
+                    <DotsThreeOutlineVerticalIcon size={20} color={colors.textSecondary} weight='fill' />
                   </TouchableOpacity>
                 </Pressable>
               );
@@ -577,11 +662,11 @@ export default function CollectionDetailScreen({ route, navigation }) {
               <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle}>Options</Text>
               <Pressable style={styles.sheetRow} onPress={openRename}>
-                <Ionicons name="pencil-outline" size={22} color={colors.textBase} />
+                <PencilSimpleIcon size={22} color={colors.textBase} weight='bold' />
                 <Text style={styles.sheetRowText}>Rename</Text>
               </Pressable>
               <Pressable style={styles.sheetRow} onPress={handleDeleteCollection}>
-                <Ionicons name="trash-outline" size={22} color={colors.red} />
+                <Trash size={22} color={colors.red} weight='bold' />
                 <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Delete collection</Text>
               </Pressable>
             </Pressable>
@@ -615,11 +700,11 @@ export default function CollectionDetailScreen({ route, navigation }) {
                   closeItemOptionsSheet(() => setShowChangeSpaceSheet(true));
                 }}
               >
-                <Ionicons name="folder-open-outline" size={22} color={colors.textBase} />
+                <ArrowsClockwiseIcon size={22} color={colors.textBase} weight='bold' />
                 <Text style={styles.sheetRowText}>Change space</Text>
               </Pressable>
               <Pressable style={styles.sheetRow} onPress={handleRemoveItemFromCollection}>
-                <Ionicons name="trash-outline" size={22} color={colors.red} />
+                <Trash size={22} color={colors.red} />
                 <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Remove from collection</Text>
               </Pressable>
             </Pressable>
@@ -662,7 +747,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
                       onPress={() => handleChangeSpace(coll)}
                       disabled={moving}
                     >
-                      <Ionicons name="folder-outline" size={22} color={colors.textBase} />
+                      <FolderSimpleIcon size={22} color={colors.textBase} weight='bold' />
                       <Text style={styles.sheetRowText} numberOfLines={1}>
                         {coll.collection_name || 'Collection'}
                       </Text>
@@ -723,316 +808,3 @@ export default function CollectionDetailScreen({ route, navigation }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bgBase },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-  },
-  headerBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerRight: { flexDirection: 'row' },
-  headerTitleWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-    textAlign: 'center',
-  },
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  emptyText: { fontSize: 16, fontFamily: fonts.regular, color: colors.textSecondary },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingTop: 4 },
-  analyticsCard: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    alignItems: 'center',
-  },
-  analyticsLabel: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textBase,
-    marginBottom: 6,
-  },
-  analyticsTotal: {
-    fontFamily: fonts.bold,
-    fontSize: 28,
-    color: colors.brand,
-  },
-  analyticsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  analyticsSmallCard: {
-    flex: 1,
-    backgroundColor: colors.bgWhite,
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    alignItems: 'center',
-  },
-  analyticsSmallLabel: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.textBase,
-    marginBottom: 4,
-  },
-  analyticsSmallValue: {
-    fontFamily: fonts.semiBold,
-    fontSize: 18,
-    color: colors.textBase,
-  },
-  itemsHeading: {
-    fontFamily: fonts.semiBold,
-    fontSize: 18,
-    color: colors.textBase,
-    marginBottom: 14,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bgWhite,
-    borderRadius: 20,
-    padding: 12,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  itemThumbWrap: { marginRight: 12 },
-  itemThumb: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: colors.border3,
-  },
-  itemThumbEmpty: {},
-  itemInfo: { flex: 1, minWidth: 0 },
-  itemName: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textBase,
-    marginBottom: 2,
-  },
-  itemCategory: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  itemPrice: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: colors.brand,
-  },
-  itemMenu: { padding: 4 },
-  listExtendedWrap: {
-    gap: 14,
-  },
-  extendedCard: {
-    width: '100%',
-    backgroundColor: colors.bgWhite,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    position: 'relative',
-  },
-  blockCardImageWrap: {
-    width: '100%',
-    aspectRatio: 2,
-    overflow: 'hidden',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-  },
-  blockCardImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.border3,
-    borderRadius: 12,
-  },
-  blockCardBody: {
-    padding: 14,
-    paddingTop: 12,
-  },
-  blockCardTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 15,
-    color: colors.textBase,
-    marginBottom: 4,
-  },
-  blockCardCategory: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  blockCardPrice: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: colors.brand,
-  },
-  blockCardMenu: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    padding: 6,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 16,
-  },
-  sheetOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.bgWhite,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border3,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 18,
-    color: colors.textBase,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  sheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-    gap: 12,
-  },
-  sheetRowText: {
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 16,
-    color: colors.textBase,
-  },
-  sheetRowTextDanger: { color: colors.red },
-  sheetRowSubtext: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
-  sheetLoading: { paddingVertical: 24, alignItems: 'center' },
-  sheetEmptyText: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    paddingVertical: 16,
-  },
-  sheetScroll: { maxHeight: 320 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: colors.bgWhite,
-    borderRadius: 16,
-    padding: 24,
-  },
-  modalTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 18,
-    color: colors.textBase,
-    marginBottom: 20,
-  },
-  modalLabel: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: colors.textBase,
-    marginBottom: 8,
-  },
-  modalInput: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.brandLight,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    fontFamily: fonts.regular,
-    color: colors.textBase,
-    marginBottom: 24,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'flex-end',
-  },
-  modalCancelBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: colors.border3,
-  },
-  modalCancelText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 15,
-    color: colors.textBase,
-  },
-  modalCreateBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    backgroundColor: colors.brand,
-    minWidth: 88,
-    alignItems: 'center',
-  },
-  modalCreateBtnDisabled: { opacity: 0.7 },
-  modalCreateText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 15,
-    color: colors.textWhite,
-  },
-});

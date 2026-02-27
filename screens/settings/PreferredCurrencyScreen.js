@@ -9,8 +9,8 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../theme';
+import { CaretLeft, MagnifyingGlass, Check } from 'phosphor-react-native';
+import { useColors, fonts } from '../../theme';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 
 const CURRENCIES = [
@@ -38,6 +38,7 @@ const CURRENCIES = [
 
 export default function PreferredCurrencyScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const preferredCurrency = useAppSettingsStore((s) => s.preferredCurrency);
   const setPreferredCurrency = useAppSettingsStore((s) => s.setPreferredCurrency);
   const [search, setSearch] = useState('');
@@ -57,23 +58,41 @@ export default function PreferredCurrencyScreen({ navigation }) {
     navigation.goBack();
   };
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.bgWhite },
+        header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+        backBtn: { padding: 4 },
+        title: { fontSize: 18, fontFamily: fonts.semiBold, color: colors.textBase },
+        headerSpacer: { width: 32 },
+        searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgBase, borderRadius: 10, marginHorizontal: 16, marginBottom: 16, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+        searchInput: { flex: 1, fontSize: 16, fontFamily: fonts.regular, color: colors.textBase, paddingVertical: 0 },
+        sectionHeader: { fontSize: 13, fontFamily: fonts.regular, color: colors.textSecondary, marginHorizontal: 16, marginBottom: 8 },
+        list: { flex: 1 },
+        row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border3 },
+        rowText: { fontSize: 16, fontFamily: fonts.regular, color: colors.textBase },
+      }),
+    [colors]
+  );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.textBase} />
+          <CaretLeft size={24} color={colors.textBase} weight="bold" />
         </TouchableOpacity>
         <Text style={styles.title}>Preferred Currency</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.searchWrap}>
-        <Ionicons name="search" size={20} color={colors.textTertiary} />
+        <MagnifyingGlass size={20} color={colors.textTertiary} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search currency"
@@ -106,7 +125,7 @@ export default function PreferredCurrencyScreen({ navigation }) {
                 {item.name} — {item.code}
               </Text>
               {selected ? (
-                <Ionicons name="checkmark" size={22} color={colors.brand} />
+                <Check size={22} color={colors.brand} />
               ) : null}
             </TouchableOpacity>
           );
@@ -115,70 +134,3 @@ export default function PreferredCurrencyScreen({ navigation }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgWhite,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backBtn: {
-    padding: 4,
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.border3,
-    borderRadius: 10,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: fonts.regular,
-    color: colors.textBase,
-    paddingVertical: 0,
-  },
-  sectionHeader: {
-    fontSize: 13,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  list: {
-    flex: 1,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border3,
-  },
-  rowText: {
-    fontSize: 16,
-    fontFamily: fonts.regular,
-    color: colors.textBase,
-  },
-});

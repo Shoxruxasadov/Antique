@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -13,11 +13,12 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { pickAndResizeAvatar } from '../../lib/pickImage';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../theme';
+import { User } from 'phosphor-react-native';
+import { useColors, fonts } from '../../theme';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { uploadAvatar } from '../../lib/avatarStorage';
@@ -25,6 +26,7 @@ import { mapSupabaseUserToStore } from '../../lib/authSync';
 
 export default function EditProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
 
@@ -88,9 +90,36 @@ export default function EditProfileScreen({ navigation }) {
 
   const displayAvatarUri = avatarUri || user?.avatar_url;
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.bgWhite },
+        keyboard: { flex: 1 },
+        header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+        backBtn: { padding: 4 },
+        backArrow: { fontSize: 24, color: colors.textBase },
+        title: { fontSize: 18, fontFamily: fonts.semiBold, color: colors.textBase },
+        headerSpacer: { width: 32 },
+        scroll: { flex: 1 },
+        scrollContent: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16, alignItems: 'center' },
+        footer: { paddingHorizontal: 24, paddingTop: 16, backgroundColor: colors.bgWhite },
+        avatarWrap: { marginBottom: 32 },
+        avatarCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.bgBase, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+        avatarImage: { width: '100%', height: '100%' },
+        fieldWrap: { width: '100%', marginBottom: 20 },
+        label: { fontSize: 14, fontFamily: fonts.medium, color: colors.textBase, marginBottom: 8 },
+        input: { width: '100%', height: 48, borderRadius: 12, backgroundColor: colors.bgBase, paddingHorizontal: 16, fontSize: 16, fontFamily: fonts.regular, color: colors.textBase },
+        inputDisabled: { backgroundColor: colors.border3, color: colors.textSecondary },
+        saveBtn: { width: '100%', height: 52, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+        saveBtnPressed: { opacity: 0.85 },
+        saveBtnText: { fontSize: 16, fontFamily: fonts.semiBold, color: colors.textWhite },
+      }),
+    [colors]
+  );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -103,7 +132,7 @@ export default function EditProfileScreen({ navigation }) {
             style={styles.backBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Text style={styles.backArrow}>←</Text>
+            <CaretLeft size={24} color={colors.textBase} weight="bold" />
           </TouchableOpacity>
           <Text style={styles.title}>Edit Profile</Text>
           <View style={styles.headerSpacer} />
@@ -121,7 +150,7 @@ export default function EditProfileScreen({ navigation }) {
               {displayAvatarUri ? (
                 <Image source={{ uri: displayAvatarUri }} style={styles.avatarImage} resizeMode="cover" />
               ) : (
-                <Ionicons name="person" size={48} color={colors.brand} />
+                <User size={48} color={colors.brand} />
               )}
             </View>
           </Pressable>
@@ -140,18 +169,17 @@ export default function EditProfileScreen({ navigation }) {
             />
           </View>
 
-          {/* Email */}
+          {/* Email — faqat ko‘rsatish, tahrirlash mumkin emas */}
           <View style={styles.fieldWrap}>
             <Text style={styles.label}>Email</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, styles.inputDisabled]}
               value={email}
-              onChangeText={setEmail}
               placeholder="johnanderson@gmail.com"
               placeholderTextColor={colors.textTertiary}
               keyboardType="email-address"
               autoCapitalize="none"
-              editable={!saving}
+              editable={false}
             />
           </View>
         </ScrollView>
@@ -174,90 +202,3 @@ export default function EditProfileScreen({ navigation }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgWhite,
-  },
-  keyboard: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backBtn: { padding: 4 },
-  backArrow: { fontSize: 24, color: colors.textBase },
-  title: {
-    fontSize: 18,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-  },
-  headerSpacer: { width: 32 },
-  scroll: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 16,
-    alignItems: 'center',
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    backgroundColor: colors.bgWhite,
-  },
-  avatarWrap: {
-    marginBottom: 32,
-  },
-  avatarCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: colors.brandLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  fieldWrap: {
-    width: '100%',
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontFamily: fonts.medium,
-    color: colors.textBase,
-    marginBottom: 8,
-  },
-  input: {
-    width: '100%',
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.brandLight,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    fontFamily: fonts.regular,
-    color: colors.textBase,
-  },
-  saveBtn: {
-    width: '100%',
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: colors.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnPressed: { opacity: 0.85 },
-  saveBtnText: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.textWhite,
-  },
-});

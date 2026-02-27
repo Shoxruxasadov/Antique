@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -13,17 +13,19 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../theme';
+import { CaretLeft, AppleLogo, GoogleLogo } from 'phosphor-react-native';
+import { useColors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { mapSupabaseUserToStore } from '../../lib/authSync';
 import { signInWithOAuthProvider } from '../../lib/oauthSupabase';
+import { openTermsOfUse, openPrivacyPolicy } from '../../lib/legalLinks';
 
 const ICON_SIZE = 22;
 
 export default function SignInScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const setUser = useAuthStore((s) => s.setUser);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -76,12 +78,42 @@ export default function SignInScreen({ navigation }) {
     }
   };
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.bgWhite },
+        backBtn: { paddingVertical: 12, paddingHorizontal: 20, alignSelf: 'flex-start' },
+        keyboardView: { flex: 1 },
+        scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
+        title: { fontFamily: fonts.bold, fontSize: 28, color: colors.textBase, textAlign: 'center', marginBottom: 8, paddingTop: 24 },
+        subtitle: { fontFamily: fonts.regular, fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 28 },
+        input: { fontFamily: fonts.regular, fontSize: 16, color: colors.textBase, backgroundColor: colors.bgBase, borderWidth: 0, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 12 },
+        forgotLink: { alignSelf: 'flex-end', marginBottom: 24 },
+        forgotText: { fontFamily: fonts.medium, fontSize: 15, color: colors.textBrand },
+        primaryBtn: { backgroundColor: colors.brand, paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginBottom: 24 },
+        primaryBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textWhite },
+        primaryBtnDisabled: { opacity: 0.7 },
+        errorText: { fontFamily: fonts.regular, fontSize: 14, color: '#C8191B', marginBottom: 12, textAlign: 'center' },
+        orRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+        orLine: { flex: 1, height: 1, backgroundColor: colors.border3 },
+        orText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginHorizontal: 12 },
+        btnApple: { flexDirection: 'row', width: '100%', backgroundColor: colors.bgInverted, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
+        btnAppleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textWhite },
+        btnGoogle: { flexDirection: 'row', width: '100%', backgroundColor: colors.bgBase, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10 },
+        btnGoogleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase },
+        legalFooter: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', marginTop: 24, paddingHorizontal: 8 },
+        legalFooterText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
+        legalFooterLink: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textBrand },
+      }),
+    [colors]
+  );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color={colors.textBase} />
+        <CaretLeft size={24} color={colors.textBase} weight="bold" />
       </Pressable>
 
       <KeyboardAvoidingView
@@ -153,7 +185,7 @@ export default function SignInScreen({ navigation }) {
             {oauthLoading === 'apple' ? (
               <ActivityIndicator color={colors.textWhite} size="small" />
             ) : (
-              <Ionicons name="logo-apple" size={ICON_SIZE} color={colors.textWhite} />
+              <AppleLogo size={ICON_SIZE} color={colors.textWhite} />
             )}
             <Text style={styles.btnAppleText}>
               {oauthLoading === 'apple' ? 'Signing in…' : 'Continue with Apple'}
@@ -168,137 +200,26 @@ export default function SignInScreen({ navigation }) {
             {oauthLoading === 'google' ? (
               <ActivityIndicator color={colors.textBase} size="small" />
             ) : (
-              <Ionicons name="logo-google" size={ICON_SIZE} color={colors.textBase} />
+              <GoogleLogo size={ICON_SIZE} color={colors.textBase} />
             )}
             <Text style={styles.btnGoogleText}>
               {oauthLoading === 'google' ? 'Signing in…' : 'Continue with Google'}
             </Text>
           </Pressable>
+
+          <View style={styles.legalFooter}>
+            <Text style={styles.legalFooterText}>By continuing, you agree to our </Text>
+            <Pressable onPress={openTermsOfUse}>
+              <Text style={styles.legalFooterLink}>Terms of Use</Text>
+            </Pressable>
+            <Text style={styles.legalFooterText}> and </Text>
+            <Pressable onPress={openPrivacyPolicy}>
+              <Text style={styles.legalFooterLink}>Privacy Policy</Text>
+            </Pressable>
+            <Text style={styles.legalFooterText}>.</Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgWhite,
-  },
-  backBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignSelf: 'flex-start',
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
-  title: {
-    fontFamily: fonts.bold,
-    fontSize: 28,
-    color: colors.textBase,
-    textAlign: 'center',
-    marginBottom: 8,
-    paddingTop: 24,
-  },
-  subtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-  input: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.textBase,
-    backgroundColor: colors.bgBase,
-    borderWidth: 0,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginBottom: 12,
-  },
-  forgotLink: {
-    alignSelf: 'flex-end',
-    marginBottom: 24,
-  },
-  forgotText: {
-    fontFamily: fonts.medium,
-    fontSize: 15,
-    color: colors.textBrand,
-  },
-  primaryBtn: {
-    backgroundColor: colors.brand,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  primaryBtnText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textWhite,
-  },
-  primaryBtnDisabled: {
-    opacity: 0.7,
-  },
-  errorText: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: '#C8191B',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  orRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border3,
-  },
-  orText: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginHorizontal: 12,
-  },
-  btnApple: {
-    flexDirection: 'row',
-    width: '100%',
-    backgroundColor: colors.bgInverted,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  btnAppleText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textWhite,
-  },
-  btnGoogle: {
-    flexDirection: 'row',
-    width: '100%',
-    backgroundColor: colors.bgBase,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  btnGoogleText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textBase,
-  },
-});

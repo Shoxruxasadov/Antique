@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,19 +10,35 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../theme';
+import { CaretLeft } from 'phosphor-react-native';
+import { useColors, fonts } from '../../theme';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const [email, setEmail] = useState('');
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.bgWhite },
+        backBtn: { paddingVertical: 12, paddingHorizontal: 20, alignSelf: 'flex-start' },
+        content: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
+        title: { fontFamily: fonts.bold, fontSize: 28, color: colors.textBase, textAlign: 'center', marginBottom: 8, paddingTop: 24 },
+        subtitle: { fontFamily: fonts.regular, fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 28 },
+        input: { fontFamily: fonts.regular, fontSize: 16, color: colors.textBase, backgroundColor: colors.bgBase, borderWidth: 0, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 24 },
+        primaryBtn: { backgroundColor: colors.brand, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+        primaryBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textWhite },
+      }),
+    [colors]
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color={colors.textBase} />
+        <CaretLeft size={24} color={colors.textBase} weight="bold" />
       </Pressable>
 
       <KeyboardAvoidingView
@@ -53,58 +69,3 @@ export default function ForgotPasswordScreen({ navigation }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgWhite,
-  },
-  backBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignSelf: 'flex-start',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  title: {
-    fontFamily: fonts.bold,
-    fontSize: 28,
-    color: colors.textBase,
-    textAlign: 'center',
-    marginBottom: 8,
-    paddingTop: 24,
-  },
-  subtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-  input: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.textBase,
-    backgroundColor: colors.bgBase,
-    borderWidth: 0,
-    // borderColor: colors.border3,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginBottom: 24,
-  },
-  primaryBtn: {
-    backgroundColor: colors.brand,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.textWhite,
-  },
-});

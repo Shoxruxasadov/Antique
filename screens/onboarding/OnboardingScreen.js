@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts } from '../../theme';
+import { useColors, fonts } from '../../theme';
 
 const { width } = Dimensions.get('window');
 
@@ -46,7 +46,7 @@ const DOT_SIZE = 8;
 const DOT_ACTIVE_WIDTH = DOT_SIZE * 3;
 const DOT_GAP = 10;
 
-function AnimatedDot({ active }) {
+function AnimatedDot({ active, styles }) {
   const widthAnim = useRef(new Animated.Value(DOT_SIZE)).current;
   const opacityAnim = useRef(new Animated.Value(0.45)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -90,9 +90,32 @@ function AnimatedDot({ active }) {
 }
 
 export default function OnboardingScreen({ navigation, onComplete, onSkip }) {
+  const colors = useColors();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
   const insets = useSafeAreaInsets();
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.bgWhite },
+        skipButton: { position: 'absolute', right: 24, zIndex: 10, padding: 8 },
+        skipText: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 16 },
+        slide: { flex: 1, paddingHorizontal: 32, paddingTop: '20%', justifyContent: 'center' },
+        imageWrapper: { marginBottom: 32 },
+        circle: { width: IMAGE_SIZE + 48, height: IMAGE_SIZE + 48, borderRadius: (IMAGE_SIZE + 48) / 2, backgroundColor: colors.bgBase, justifyContent: 'center', alignItems: 'center' },
+        slideImage: { width: IMAGE_SIZE, height: IMAGE_SIZE },
+        title: { fontFamily: fonts.bold, fontSize: 26, color: colors.textBase, textAlign: 'center', marginBottom: 12, paddingHorizontal: 8 },
+        description: { fontFamily: fonts.regular, fontSize: 16, color: colors.textSecondary, textAlign: 'center', lineHeight: 24, paddingHorizontal: 8 },
+        footer: { paddingHorizontal: 24, paddingTop: 24, gap: 24 },
+        pagination: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: DOT_GAP },
+        dotBase: { height: DOT_SIZE, borderRadius: DOT_SIZE / 2, backgroundColor: colors.border3 },
+        dotActiveColor: { backgroundColor: colors.textBase },
+        continueButton: { backgroundColor: colors.brand, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+        continueButtonText: { fontFamily: fonts.semiBold, color: colors.textWhite, fontSize: 18 },
+      }),
+    [colors]
+  );
 
   const finishOnboarding = () => {
     onComplete?.();
@@ -129,7 +152,7 @@ export default function OnboardingScreen({ navigation, onComplete, onSkip }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <Pressable
         style={[styles.skipButton, { top: insets.top + 12 }]}
         onPress={finishOnboarding}
@@ -154,7 +177,7 @@ export default function OnboardingScreen({ navigation, onComplete, onSkip }) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.pagination}>
           {SLIDES.map((_, index) => (
-            <AnimatedDot key={index} active={index === currentIndex} />
+            <AnimatedDot key={index} active={index === currentIndex} styles={styles} />
           ))}
         </View>
         <Pressable style={styles.continueButton} onPress={handleNext}>
@@ -166,88 +189,3 @@ export default function OnboardingScreen({ navigation, onComplete, onSkip }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgWhite,
-  },
-  skipButton: {
-    position: 'absolute',
-    right: 24,
-    zIndex: 10,
-    padding: 8,
-  },
-  skipText: {
-    fontFamily: fonts.medium,
-    color: colors.textSecondary,
-    fontSize: 16,
-  },
-  slide: {
-    flex: 1,
-    paddingHorizontal: 32,
-    paddingTop: '20%',
-    justifyContent: 'center',
-  },
-  imageWrapper: {
-    marginBottom: 32,
-  },
-  circle: {
-    width: IMAGE_SIZE + 48,
-    height: IMAGE_SIZE + 48,
-    borderRadius: (IMAGE_SIZE + 48) / 2,
-    backgroundColor: colors.brandLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  slideImage: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-  },
-  title: {
-    fontFamily: fonts.bold,
-    fontSize: 26,
-    color: colors.textBase,
-    textAlign: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 8,
-  },
-  description: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 8,
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    gap: 24,
-  },
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: DOT_GAP,
-  },
-  dotBase: {
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
-    backgroundColor: colors.border3,
-  },
-  dotActiveColor: {
-    backgroundColor: colors.textBase,
-  },
-  continueButton: {
-    backgroundColor: colors.brand,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    fontFamily: fonts.semiBold,
-    color: colors.textWhite,
-    fontSize: 18,
-  },
-});
