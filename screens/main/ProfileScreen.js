@@ -307,11 +307,12 @@ export default function ProfileScreen({ navigation }) {
         onPress: async () => {
           if (isSupabaseConfigured() && supabase) await supabase.auth.signOut();
           signOut();
+          useOnboardingStore.getState().resetOnboarding();
           useOnboardingStore.getState().resetSkippedGetStarted();
           if (rootNav) {
-            rootNav.reset({ index: 0, routes: [{ name: "GetStarted" }] });
+            rootNav.reset({ index: 0, routes: [{ name: "Onboarding" }] });
           } else {
-            mainStack?.navigate("GetStarted");
+            mainStack?.navigate("Onboarding");
           }
         },
       },
