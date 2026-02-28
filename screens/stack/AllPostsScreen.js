@@ -72,22 +72,33 @@ export default function AllPostsScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    tabLayouts.current = Array(tabs.length).fill(null);
-  }, [tabs.length]);
-
-  useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const categoryId = activeTab === 0 ? null : categories[activeTab - 1]?.id ?? null;
     (async () => {
-      const list = await fetchBlogs({ categoryId });
+      const list = await fetchBlogs({});
       if (!cancelled) {
         setPosts(list);
         setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [activeTab, categories]);
+  }, []);
+
+  const postsForTab = useMemo(() => {
+    if (activeTab === 0) return posts;
+    const categoryId = categories[activeTab - 1]?.id;
+    if (categoryId == null) return posts;
+    return posts.filter((p) => p.category === categoryId);
+  }, [posts, activeTab, categories]);
+
+  useEffect(() => {
+    const prev = tabLayouts.current;
+    const next = Array(tabs.length).fill(null);
+    for (let i = 0; i < prev.length && i < next.length; i++) {
+      if (prev[i]) next[i] = prev[i];
+    }
+    tabLayouts.current = next;
+  }, [tabs.length]);
 
   const styles = useMemo(
     () =>
@@ -201,12 +212,12 @@ export default function AllPostsScreen({ navigation }) {
           <View style={styles.emptyCard}>
             <ActivityIndicator size="small" color={colors.brand} />
           </View>
-        ) : posts.length === 0 ? (
+        ) : postsForTab.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyCardText}>No posts yet</Text>
           </View>
         ) : (
-          posts.map((post) => (
+          postsForTab.map((post) => (
             <BlogCard
               key={post.id}
               post={post}

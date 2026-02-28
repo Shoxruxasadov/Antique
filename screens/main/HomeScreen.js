@@ -514,7 +514,7 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const posts = await fetchLatestBlogs(5);
+      const posts = await fetchLatestBlogs(3);
       if (!cancelled) setBlogPosts(posts);
     })();
     return () => { cancelled = true; };
@@ -524,7 +524,7 @@ export default function HomeScreen({ navigation }) {
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const posts = await fetchLatestBlogs(5);
+        const posts = await fetchLatestBlogs(3);
         if (!cancelled) setBlogPosts(posts);
       })();
       return () => { cancelled = true; };
