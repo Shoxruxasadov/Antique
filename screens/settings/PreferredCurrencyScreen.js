@@ -66,7 +66,7 @@ export default function PreferredCurrencyScreen({ navigation }) {
         backBtn: { padding: 4 },
         title: { fontSize: 18, fontFamily: fonts.semiBold, color: colors.textBase },
         headerSpacer: { width: 32 },
-        searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgBase, borderRadius: 10, marginHorizontal: 16, marginBottom: 16, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+        searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.border1, borderRadius: 10, marginHorizontal: 16, marginBottom: 16, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
         searchInput: { flex: 1, fontSize: 16, fontFamily: fonts.regular, color: colors.textBase, paddingVertical: 0 },
         sectionHeader: { fontSize: 13, fontFamily: fonts.regular, color: colors.textSecondary, marginHorizontal: 16, marginBottom: 8 },
         list: { flex: 1 },

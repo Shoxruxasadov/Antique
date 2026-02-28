@@ -4,28 +4,25 @@ import {
   View,
   Text,
   ScrollView,
-  Pressable,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'phosphor-react-native';
 import { useColors, fonts } from '../../theme';
 
-const MOCK_BODY = `Age, condition, historical significance, craftsmanship, and market demand all play a role in determining an item's value.
-
-1. Age Alone Is Not Enough
-
-While antiques are typically defined as objects at least 100 years old, age alone does not guarantee value. A well-preserved piece with documented provenance and aesthetic appeal will often outperform a similar but damaged or unremarkable item.`;
+const FALLBACK_BODY = 'No content available.';
 
 export default function PostScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const post = route?.params?.post || {
-    title: 'Understanding Antique Rarity: What Makes a Antique Valuable?',
-    readTime: '3 min read',
-    meta: 'France · 1800 - 1900 yrs',
+    title: 'Post',
+    readTime: '',
+    content: FALLBACK_BODY,
   };
+  const bodyText = post.content || post.excerpt || FALLBACK_BODY;
 
   const styles = useMemo(
     () =>
@@ -48,7 +45,11 @@ export default function PostScreen({ route, navigation }) {
     <View style={styles.container}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <View style={styles.headerImage}>
-        <View style={styles.headerImagePlaceholder} />
+        {post.image_url ? (
+          <Image source={{ uri: post.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={styles.headerImagePlaceholder} />
+        )}
         <TouchableOpacity
           style={styles.closeBtn}
           onPress={() => navigation.goBack()}
@@ -66,7 +67,7 @@ export default function PostScreen({ route, navigation }) {
         <View style={styles.cardHandle} />
         <Text style={styles.cardTitle}>{post.title}</Text>
         <Text style={styles.cardMeta}>{post.meta || post.readTime}</Text>
-        <Text style={styles.cardBody}>{MOCK_BODY}</Text>
+        <Text style={styles.cardBody}>{bodyText}</Text>
       </ScrollView>
     </View>
   );

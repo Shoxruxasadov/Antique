@@ -16,13 +16,20 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CrownSimpleIcon, Camera, DotsThreeOutlineVerticalIcon, CaretRight, Trash } from "phosphor-react-native";
+import {
+  CrownSimpleIcon,
+  Camera,
+  DotsThreeOutlineVerticalIcon,
+  CaretRight,
+  Trash,
+} from "phosphor-react-native";
 import { useColors, fonts } from "../../theme";
 import { useAppSettingsStore } from "../../stores/useAppSettingsStore";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useExchangeRatesStore } from "../../stores/useExchangeRatesStore";
 import { formatPriceUsd } from "../../lib/currency";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
+import { fetchLatestBlogs } from "../../lib/blogApi";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 
 const CARD_COUNT = 6;
@@ -60,18 +67,6 @@ const CURRENCY_FLAGS = {
   SAR: "🇸🇦",
 };
 
-const MOCK_BLOG_POSTS = [
-  {
-    id: "1",
-    title: "Understanding Antique Rarity: What Makes a Antique Valuable?",
-    readTime: "3 min read",
-  },
-  {
-    id: "2",
-    title: "Understanding Coin Rarity: What Makes a Coin Valuable?",
-    readTime: "5 min read",
-  },
-];
 
 function createCardAnims() {
   return Array.from({ length: CARD_COUNT }, () => ({
@@ -92,13 +87,16 @@ export default function HomeScreen({ navigation }) {
   const user = useAuthStore((s) => s.user);
 
   const [lastSnaps, setLastSnaps] = useState([]);
+  const [blogPosts, setBlogPosts] = useState([]);
   const [showHistoryOptionsSheet, setShowHistoryOptionsSheet] = useState(false);
   const [selectedSnap, setSelectedSnap] = useState(null);
   const [proBtnLayout, setProBtnLayout] = useState({ width: 0, height: 0 });
   const cardAnims = useRef(createCardAnims()).current;
   const mainStack = navigation.getParent();
   const sheetOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const sheetTranslateY = useRef(new Animated.Value(Dimensions.get("window").height)).current;
+  const sheetTranslateY = useRef(
+    new Animated.Value(Dimensions.get("window").height),
+  ).current;
 
   const easeOut = Easing.bezier(0.25, 0.1, 0.25, 1);
 
@@ -253,6 +251,28 @@ export default function HomeScreen({ navigation }) {
           color: colors.brand,
         },
         snapDots: { padding: 4 },
+        snapEmptyCard: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.bgWhite,
+          borderRadius: 20,
+          padding: 24,
+          minHeight: 88,
+          flex: 1,
+          minWidth: 200,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 4,
+          elevation: 2,
+        },
+        snapEmptyText: {
+          fontFamily: fonts.regular,
+          fontSize: 15,
+          color: colors.textSecondary,
+          textAlign: "center",
+        },
         seeAllBtn: {
           flexDirection: "column",
           alignItems: "center",
@@ -322,6 +342,17 @@ export default function HomeScreen({ navigation }) {
           fontSize: 13,
           color: colors.textSecondary,
         },
+        blogEmptyCard: {
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: 120,
+        },
+        blogEmptyCardText: {
+          fontFamily: fonts.regular,
+          fontSize: 15,
+          color: colors.textSecondary,
+          textAlign: "center",
+        },
         sheetOverlay: {
           backgroundColor: "rgba(0,0,0,0.4)",
         },
@@ -363,7 +394,7 @@ export default function HomeScreen({ navigation }) {
         },
         sheetRowTextDanger: { color: colors.red },
       }),
-    [colors]
+    [colors],
   );
 
   useEffect(() => {
@@ -405,7 +436,7 @@ export default function HomeScreen({ navigation }) {
         onDone?.();
       });
     },
-    [sheetOverlayOpacity, sheetTranslateY]
+    [sheetOverlayOpacity, sheetTranslateY],
   );
 
   const handleDeleteSnap = useCallback(() => {
@@ -429,7 +460,7 @@ export default function HomeScreen({ navigation }) {
               }
             },
           },
-        ]
+        ],
       );
     });
   }, [selectedSnap, closeHistoryOptionsSheet, supabase]);
@@ -481,6 +512,26 @@ export default function HomeScreen({ navigation }) {
   );
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const posts = await fetchLatestBlogs(5);
+      if (!cancelled) setBlogPosts(posts);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const posts = await fetchLatestBlogs(5);
+        if (!cancelled) setBlogPosts(posts);
+      })();
+      return () => { cancelled = true; };
+    }, []),
+  );
+
+  useEffect(() => {
     if (!user?.id || !isSupabaseConfigured() || !supabase) {
       setLastSnaps([]);
       return;
@@ -494,11 +545,11 @@ export default function HomeScreen({ navigation }) {
           .order("created_at", { ascending: false })
           .limit(3);
         const sorted = (data ?? []).slice().sort((a, b) => {
-          const ca = a.created_at ?? '';
-          const cb = b.created_at ?? '';
+          const ca = a.created_at ?? "";
+          const cb = b.created_at ?? "";
           const byTime = cb.localeCompare(ca);
           if (byTime !== 0) return byTime;
-          return String(b.id ?? '').localeCompare(String(a.id ?? ''));
+          return String(b.id ?? "").localeCompare(String(a.id ?? ""));
         });
         setLastSnaps(sorted);
       } catch (_) {
@@ -509,11 +560,10 @@ export default function HomeScreen({ navigation }) {
 
   const snapCardWidth = width * 0.72;
   const blogCardWidth = width * 0.55;
-  const rowPadding = 16;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
+      <StatusBar style={colors.isDark ? "light" : "dark"} />
 
       <ScrollView
         contentContainerStyle={[
@@ -547,7 +597,11 @@ export default function HomeScreen({ navigation }) {
               onPress={() => mainStack?.navigate("Pro")}
               onLayout={(e) => {
                 const { width, height } = e.nativeEvent.layout;
-                setProBtnLayout((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+                setProBtnLayout((prev) =>
+                  prev.width === width && prev.height === height
+                    ? prev
+                    : { width, height },
+                );
               }}
             >
               {proBtnLayout.width > 0 && proBtnLayout.height > 0 && (
@@ -555,11 +609,11 @@ export default function HomeScreen({ navigation }) {
                   style={StyleSheet.absoluteFill}
                   width={proBtnLayout.width}
                   height={proBtnLayout.height}
-                > 
+                >
                   <Defs>
-                    <LinearGradient id="proBtnGrad" x1="0" y1="0" x2="0" y2="1">
-                      <Stop offset="0" stopColor="#D4AF37" />
-                      <Stop offset="1" stopColor="#A98A49" />
+                    <LinearGradient id="proBtnGrad" x1="0" y1="0" x2="1" y2="0">
+                      <Stop offset="0" stopColor="#FFB900" />
+                      <Stop offset="1" stopColor="#F7880B" />
                     </LinearGradient>
                   </Defs>
                   <Rect
@@ -574,7 +628,11 @@ export default function HomeScreen({ navigation }) {
                 </Svg>
               )}
               <View style={styles.proBtnContent}>
-                <CrownSimpleIcon size={20} color={colors.textWhite} weight="fill" />
+                <CrownSimpleIcon
+                  size={20}
+                  color={colors.textWhite}
+                  weight="fill"
+                />
                 <Text style={styles.proBtnText}>PRO</Text>
               </View>
             </Pressable>
@@ -608,7 +666,7 @@ export default function HomeScreen({ navigation }) {
         </Animated.View>
 
         {/* Row 1: Snap History — card 2 */}
-        {lastSnaps.length>0 && <Animated.View
+        <Animated.View
           style={{
             opacity: cardAnims[2].opacity,
             transform: [{ translateY: cardAnims[2].translateY }],
@@ -621,87 +679,117 @@ export default function HomeScreen({ navigation }) {
             contentContainerStyle={styles.snapRowContent}
             style={styles.snapRowScroll}
           >
-            {lastSnaps.map((snap) => {
-              const category = Array.isArray(snap.payload?.category)
-                ? snap.payload.category.join(", ")
-                : snap.payload?.category || "Antique";
-              const min = snap.payload?.market_value_min;
-              const max = snap.payload?.market_value_max;
-              const est = snap.payload?.estimated_market_value_usd;
-              const currentValue = (min != null && Number(min) > 0) ? Number(min) : (max != null && Number(max) > 0) ? Number(max) : (est != null ? Number(est) : null);
-              const priceStr = currentValue != null && currentValue > 0 ? formatPriceUsd(currentValue, displayCurrency, rate) : "";
-              return (
-                <Pressable
-                  key={snap.id}
-                  style={[styles.snapCard, { width: snapCardWidth }]}
-                  onPress={() => {
-                    if (snap.antique_id) {
-                      mainStack?.navigate("ItemDetails", {
-                        antiqueId: snap.antique_id,
-                        fromHistory: true,
-                      });
-                    }
-                  }}
-                >
-                  <View style={styles.snapThumbWrap}>
-                    {snap.image_url ? (
-                      <Image
-                        source={{ uri: snap.image_url }}
-                        style={styles.snapThumb}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={[styles.snapThumb, styles.snapThumbEmpty]} />
-                    )}
-                  </View>
-                  <View style={styles.snapInfo}>
-                    <Text style={styles.snapTitle} numberOfLines={1}>
-                      {snap.payload?.name || "Scan"}
-                    </Text>
-                    <Text style={styles.snapCategory} numberOfLines={1}>
-                      {category}
-                    </Text>
-                    {priceStr ? (
-                      <Text style={styles.snapPrice} numberOfLines={1}>
-                        {priceStr}
-                      </Text>
-                    ) : null}
-                  </View>
+            {lastSnaps.length === 0 ? (
+              <Pressable
+                style={[styles.snapEmptyCard, { width: width - 32 }]}
+                onPress={() => {
+                  useAppSettingsStore
+                    .getState()
+                    .setOpenCollectionToHistory(true);
+                  navigation.navigate("Collection");
+                }}
+              >
+                <Text style={styles.snapEmptyText}>No scans yet</Text>
+              </Pressable>
+            ) : (
+              lastSnaps.map((snap) => {
+                const category = Array.isArray(snap.payload?.category)
+                  ? snap.payload.category.join(", ")
+                  : snap.payload?.category || "Antique";
+                const min = snap.payload?.market_value_min;
+                const max = snap.payload?.market_value_max;
+                const est = snap.payload?.estimated_market_value_usd;
+                const currentValue =
+                  min != null && Number(min) > 0
+                    ? Number(min)
+                    : max != null && Number(max) > 0
+                      ? Number(max)
+                      : est != null
+                        ? Number(est)
+                        : null;
+                const priceStr =
+                  currentValue != null && currentValue > 0
+                    ? formatPriceUsd(currentValue, displayCurrency, rate)
+                    : "";
+                return (
                   <Pressable
-                    style={styles.snapDots}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      setSelectedSnap(snap);
-                      setShowHistoryOptionsSheet(true);
+                    key={snap.id}
+                    style={[styles.snapCard, { width: snapCardWidth }]}
+                    onPress={() => {
+                      if (snap.antique_id) {
+                        mainStack?.navigate("ItemDetails", {
+                          antiqueId: snap.antique_id,
+                          fromHistory: true,
+                        });
+                      }
                     }}
-                    hitSlop={12}
                   >
-                    <DotsThreeOutlineVerticalIcon
-                      size={20}
-                      color={colors.textSecondary}
-                      weight="fill"
-                    />
+                    <View style={styles.snapThumbWrap}>
+                      {snap.image_url ? (
+                        <Image
+                          source={{ uri: snap.image_url }}
+                          style={styles.snapThumb}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={[styles.snapThumb, styles.snapThumbEmpty]}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.snapInfo}>
+                      <Text style={styles.snapTitle} numberOfLines={1}>
+                        {snap.payload?.name || "Scan"}
+                      </Text>
+                      <Text style={styles.snapCategory} numberOfLines={1}>
+                        {category}
+                      </Text>
+                      {priceStr ? (
+                        <Text style={styles.snapPrice} numberOfLines={1}>
+                          {priceStr}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Pressable
+                      style={styles.snapDots}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setSelectedSnap(snap);
+                        setShowHistoryOptionsSheet(true);
+                      }}
+                      hitSlop={12}
+                    >
+                      <DotsThreeOutlineVerticalIcon
+                        size={20}
+                        color={colors.textSecondary}
+                        weight="fill"
+                      />
+                    </Pressable>
                   </Pressable>
-                </Pressable>
-              );
-            })}
-            <Pressable
-              style={[
-                styles.seeAllBtn,
-                { width: snapCardWidth * 0.32, marginRight: 0 },
-              ]}
-              onPress={() => {
-                useAppSettingsStore.getState().setOpenCollectionToHistory(true);
-                navigation.navigate('Collection');
-              }}
-            >
-              <View style={styles.seeAllCircle}>
-                <CaretRight size={22} color={colors.brand} />
-              </View>
-              <Text style={styles.seeAllText}>See All</Text>
-            </Pressable>
+                );
+              })
+            )}
+            {lastSnaps.length > 0 && (
+              <Pressable
+                style={[
+                  styles.seeAllBtn,
+                  { width: snapCardWidth * 0.32, marginRight: 0 },
+                ]}
+                onPress={() => {
+                  useAppSettingsStore
+                    .getState()
+                    .setOpenCollectionToHistory(true);
+                  navigation.navigate("Collection");
+                }}
+              >
+                <View style={styles.seeAllCircle}>
+                  <CaretRight size={22} color={colors.brand} />
+                </View>
+                <Text style={styles.seeAllText}>See All</Text>
+              </Pressable>
+            )}
           </ScrollView>
-        </Animated.View>}
+        </Animated.View>
 
         {/* Row 2: Collectors Blog — card 3 */}
         <Animated.View
@@ -717,35 +805,58 @@ export default function HomeScreen({ navigation }) {
             contentContainerStyle={styles.snapRowContent}
             style={styles.snapRowScroll}
           >
-            {MOCK_BLOG_POSTS.map((post) => (
+            {blogPosts.length === 0 ? (
               <Pressable
-                key={post.id}
-                style={[styles.blogCard, { width: blogCardWidth }]}
-                onPress={() => mainStack?.navigate("Post", { post })}
+                style={[styles.blogCard, styles.blogEmptyCard, { width: blogCardWidth }]}
+                onPress={() => mainStack?.navigate("AllPosts")}
               >
-                <View style={styles.blogCardImageWrap}>
-                  <View style={[styles.blogCardImage, styles.blogThumbEmpty]} />
-                </View>
-                <View style={styles.blogCardBody}>
-                  <Text style={styles.blogCardTitle} numberOfLines={2} ellipsizeMode="tail">
-                    {post.title}
-                  </Text>
-                  <Text style={styles.blogCardMeta}>{post.readTime}</Text>
-                </View>
+                <Text style={styles.blogEmptyCardText}>No posts yet</Text>
               </Pressable>
-            ))}
-            <Pressable
-              style={[
-                styles.seeAllBtn,
-                { width: blogCardWidth * 0.41, marginRight: 0 },
-              ]}
-              onPress={() => mainStack?.navigate("AllPosts")}
-            >
-              <View style={styles.seeAllCircle}>
-                <CaretRight size={22} color={colors.brand} />
-              </View>
-              <Text style={styles.seeAllText}>See All</Text>
-            </Pressable>
+            ) : (
+              blogPosts.map((post) => (
+                <Pressable
+                  key={post.id}
+                  style={[styles.blogCard, { width: blogCardWidth }]}
+                  onPress={() => mainStack?.navigate("Post", { post })}
+                >
+                  <View style={styles.blogCardImageWrap}>
+                    {post.image_url ? (
+                      <Image
+                        source={{ uri: post.image_url }}
+                        style={styles.blogCardImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[styles.blogCardImage, styles.blogThumbEmpty]} />
+                    )}
+                  </View>
+                  <View style={styles.blogCardBody}>
+                    <Text
+                      style={styles.blogCardTitle}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                    >
+                      {post.title}
+                    </Text>
+                    <Text style={styles.blogCardMeta}>{post.readTime}</Text>
+                  </View>
+                </Pressable>
+              ))
+            )}
+            {blogPosts.length > 0 && (
+              <Pressable
+                style={[
+                  styles.seeAllBtn,
+                  { width: blogCardWidth * 0.41, marginRight: 0 },
+                ]}
+                onPress={() => mainStack?.navigate("AllPosts")}
+              >
+                <View style={styles.seeAllCircle}>
+                  <CaretRight size={22} color={colors.brand} />
+                </View>
+                <Text style={styles.seeAllText}>See All</Text>
+              </Pressable>
+            )}
           </ScrollView>
         </Animated.View>
       </ScrollView>
@@ -759,14 +870,24 @@ export default function HomeScreen({ navigation }) {
       >
         <View style={[StyleSheet.absoluteFill, { justifyContent: "flex-end" }]}>
           <Animated.View
-            style={[StyleSheet.absoluteFill, styles.sheetOverlay, { opacity: sheetOverlayOpacity }]}
+            style={[
+              StyleSheet.absoluteFill,
+              styles.sheetOverlay,
+              { opacity: sheetOverlayOpacity },
+            ]}
           >
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => closeHistoryOptionsSheet()} />
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => closeHistoryOptionsSheet()}
+            />
           </Animated.View>
           <Animated.View
             style={[
               styles.sheet,
-              { paddingBottom: insets.bottom + 24, transform: [{ translateY: sheetTranslateY }] },
+              {
+                paddingBottom: insets.bottom + 24,
+                transform: [{ translateY: sheetTranslateY }],
+              },
             ]}
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
@@ -774,7 +895,9 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.sheetTitle}>Options</Text>
               <Pressable style={styles.sheetRow} onPress={handleDeleteSnap}>
                 <Trash size={22} color={colors.red} />
-                <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Delete</Text>
+                <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>
+                  Delete
+                </Text>
               </Pressable>
             </Pressable>
           </Animated.View>

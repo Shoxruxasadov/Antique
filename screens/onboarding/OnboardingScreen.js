@@ -61,34 +61,35 @@ const SLIDES = [
 const DOT_SIZE = 8;
 const DOT_ACTIVE_WIDTH = 24;
 const DOT_GAP = 8;
+const INDICATOR_DURATION = 280;
 
 function PageIndicatorDot({ active }) {
   const widthAnim = useRef(new Animated.Value(DOT_SIZE)).current;
-  const opacityAnim = useRef(new Animated.Value(0.5)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(active ? 1 : 0.45)).current;
+  const scaleYAnim = useRef(new Animated.Value(active ? 1 : 0.85)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(widthAnim, {
+      Animated.timing(widthAnim, {
         toValue: active ? DOT_ACTIVE_WIDTH : DOT_SIZE,
+        duration: INDICATOR_DURATION,
         useNativeDriver: false,
-        friction: 7,
-        tension: 120,
+        easing: Easing.bezier(0.33, 1, 0.68, 1),
       }),
       Animated.timing(opacityAnim, {
-        toValue: active ? 1 : 0.5,
-        duration: 220,
+        toValue: active ? 1 : 0.45,
+        duration: INDICATOR_DURATION,
         useNativeDriver: false,
-        easing: Easing.out(Easing.cubic),
+        easing: Easing.out(Easing.quad),
       }),
-      Animated.spring(scaleAnim, {
-        toValue: active ? 1 : 0.92,
+      Animated.timing(scaleYAnim, {
+        toValue: active ? 1 : 0.85,
+        duration: INDICATOR_DURATION,
         useNativeDriver: false,
-        friction: 6,
-        tension: 100,
+        easing: Easing.bezier(0.33, 1, 0.68, 1),
       }),
     ]).start();
-  }, [active, widthAnim, opacityAnim, scaleAnim]);
+  }, [active, widthAnim, opacityAnim, scaleYAnim]);
 
   return (
     <Animated.View
@@ -98,7 +99,7 @@ function PageIndicatorDot({ active }) {
           width: widthAnim,
           opacity: opacityAnim,
           backgroundColor: active ? darkTheme.textBase : darkTheme.border3,
-          transform: [{ scale: scaleAnim }],
+          transform: [{ scaleY: scaleYAnim }],
         },
       ]}
     />
@@ -273,6 +274,14 @@ export default function OnboardingScreen({ navigation, onComplete }) {
     }
   };
 
+  const onScroll = (e) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / WINDOW_WIDTH);
+    if (index >= 0 && index < SLIDES.length && index !== currentIndex) {
+      setCurrentIndex(index);
+    }
+  };
+
   const onMomentumScrollEnd = (e) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / WINDOW_WIDTH);
     if (index >= 0 && index < SLIDES.length) setCurrentIndex(index);
@@ -302,6 +311,8 @@ export default function OnboardingScreen({ navigation, onComplete }) {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           onMomentumScrollEnd={onMomentumScrollEnd}
         />
       </View>

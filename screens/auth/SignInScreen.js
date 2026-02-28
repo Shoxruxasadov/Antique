@@ -10,10 +10,12 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CaretLeft, AppleLogo, GoogleLogo } from 'phosphor-react-native';
+import { CaretLeft } from 'phosphor-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useColors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -87,7 +89,7 @@ export default function SignInScreen({ navigation }) {
         scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
         title: { fontFamily: fonts.bold, fontSize: 28, color: colors.textBase, textAlign: 'center', marginBottom: 8, paddingTop: 24 },
         subtitle: { fontFamily: fonts.regular, fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 28 },
-        input: { fontFamily: fonts.regular, fontSize: 16, color: colors.textBase, backgroundColor: colors.bgBase, borderWidth: 0, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 12 },
+        input: { fontFamily: fonts.regular, fontSize: 16, color: colors.textBase, backgroundColor: colors.border1, borderWidth: 0, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 12 },
         forgotLink: { alignSelf: 'flex-end', marginBottom: 24 },
         forgotText: { fontFamily: fonts.medium, fontSize: 15, color: colors.textBrand },
         primaryBtn: { backgroundColor: colors.brand, paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginBottom: 24 },
@@ -98,12 +100,9 @@ export default function SignInScreen({ navigation }) {
         orLine: { flex: 1, height: 1, backgroundColor: colors.border3 },
         orText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginHorizontal: 12 },
         btnApple: { flexDirection: 'row', width: '100%', backgroundColor: colors.bgInverted, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
-        btnAppleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textWhite },
-        btnGoogle: { flexDirection: 'row', width: '100%', backgroundColor: colors.bgBase, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10 },
+        btnAppleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textInverse },
+        btnGoogle: { flexDirection: 'row', width: '100%', backgroundColor: colors.border1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10 },
         btnGoogleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase },
-        legalFooter: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', marginTop: 24, paddingHorizontal: 8 },
-        legalFooterText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
-        legalFooterLink: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textBrand },
       }),
     [colors]
   );
@@ -185,7 +184,7 @@ export default function SignInScreen({ navigation }) {
             {oauthLoading === 'apple' ? (
               <ActivityIndicator color={colors.textWhite} size="small" />
             ) : (
-              <AppleLogo size={ICON_SIZE} color={colors.textWhite} />
+              <Ionicons name="logo-apple" size={22} color={colors.textInverse} />
             )}
             <Text style={styles.btnAppleText}>
               {oauthLoading === 'apple' ? 'Signing in…' : 'Continue with Apple'}
@@ -200,24 +199,12 @@ export default function SignInScreen({ navigation }) {
             {oauthLoading === 'google' ? (
               <ActivityIndicator color={colors.textBase} size="small" />
             ) : (
-              <GoogleLogo size={ICON_SIZE} color={colors.textBase} />
+              <Image source={require('../../assets/google.webp')} style={{ width: 19, height: 19, margin: 1.5, marginRight: 0 }} resizeMode="contain" />
             )}
             <Text style={styles.btnGoogleText}>
               {oauthLoading === 'google' ? 'Signing in…' : 'Continue with Google'}
             </Text>
           </Pressable>
-
-          <View style={styles.legalFooter}>
-            <Text style={styles.legalFooterText}>By continuing, you agree to our </Text>
-            <Pressable onPress={openTermsOfUse}>
-              <Text style={styles.legalFooterLink}>Terms of Use</Text>
-            </Pressable>
-            <Text style={styles.legalFooterText}> and </Text>
-            <Pressable onPress={openPrivacyPolicy}>
-              <Text style={styles.legalFooterLink}>Privacy Policy</Text>
-            </Pressable>
-            <Text style={styles.legalFooterText}>.</Text>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

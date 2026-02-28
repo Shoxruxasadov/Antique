@@ -45,7 +45,7 @@ export default function InfoScannerScreen({ navigation }) {
       StyleSheet.create({
         container: { flex: 1 },
         scrollView: { flex: 1, paddingHorizontal: 24, paddingTop: 60, justifyContent: 'center', alignItems: 'center' },
-        mainTitle: { fontFamily: fonts.bold, fontSize: 28, color: colors.textWhite, textAlign: 'center', marginBottom: 28 },
+        mainTitle: { fontFamily: fonts.bold, fontSize: 28, color: "#ffffff", textAlign: 'center', marginBottom: 28 },
         goodWrap: { alignItems: 'center', marginBottom: 28 },
         circleWrap: { overflow: 'hidden', position: 'relative' },
         circleImage: {},
@@ -53,12 +53,12 @@ export default function InfoScannerScreen({ navigation }) {
         badgeGood: { backgroundColor: '#44D84B' },
         badgeBad: { backgroundColor: '#C8191B' },
         tipItem: { alignItems: 'center' },
-        tipLabel: { fontFamily: fonts.regular, fontSize: 14, color: colors.textWhite, marginTop: 10, textAlign: 'center', marginBottom: 40 },
+        tipLabel: { fontFamily: fonts.regular, fontSize: 14, color: "#ffffff", marginTop: 10, textAlign: 'center', marginBottom: 40 },
         badRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 12 },
         badItem: { flex: 1, alignItems: 'center', marginHorizontal: 8 },
         footer: { paddingHorizontal: 24, paddingTop: 16 },
-        doneButton: { backgroundColor: colors.bgWhite, borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-        doneButtonText: { fontFamily: fonts.semiBold, fontSize: 17, color: colors.textBase },
+        doneButton: { backgroundColor: "#ffffff", borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+        doneButtonText: { fontFamily: fonts.semiBold, fontSize: 17, color: "#000000" },
       }),
     [colors]
   );

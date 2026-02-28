@@ -82,7 +82,7 @@ export default function SignUpScreen({ navigation }) {
         scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
         title: { fontFamily: fonts.bold, fontSize: 28, color: colors.textBase, textAlign: 'center', marginBottom: 8, paddingTop: 24 },
         subtitle: { fontFamily: fonts.regular, fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 28 },
-        input: { fontFamily: fonts.regular, fontSize: 16, color: colors.textBase, backgroundColor: colors.bgBase, borderWidth: 0, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 12 },
+        input: { fontFamily: fonts.regular, fontSize: 16, color: colors.textBase, backgroundColor: colors.border1, borderWidth: 0, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 12 },
         primaryBtn: { backgroundColor: colors.brand, paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 8, marginBottom: 32 },
         primaryBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textWhite },
         primaryBtnDisabled: { opacity: 0.7 },

@@ -18,6 +18,7 @@ import { useAssistantStore } from './stores/useAssistantStore';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { mapSupabaseUserToStore } from './lib/authSync';
 import AppNavigator from './navigation/AppNavigator';
+import { configureRevenueCat } from './lib/revenueCat';
 
 // Top-level splash chaqiruvini olib tashlaymiz — ba'zi build'larda native crash sabab bo‘lishi mumkin
 try {
@@ -31,7 +32,13 @@ export default function App() {
   const [appReady, setAppReady] = useState(false);
   const [startupError, setStartupError] = useState(null);
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
+  const hasSeenOnboarding = useOnboardingStore((s) => s.hasSeenOnboarding);
+  const hasSkippedGetStarted = useOnboardingStore((s) => s.hasSkippedGetStarted);
+  const user = useAuthStore((s) => s.user);
   const timedOut = useRef(false);
+
+  const initialRoute =
+    !hasSeenOnboarding ? 'Onboarding' : user || hasSkippedGetStarted ? 'Main' : 'GetStarted';
 
   const [fontsLoaded, fontError] = useFonts({
     AlbertSans_400Regular,
@@ -71,12 +78,11 @@ export default function App() {
         ]);
         if (cancelled) return;
         try {
-          useExchangeRatesStore.getState().fetchRates();
+          configureRevenueCat();
         } catch (_) {}
         try {
-          useOnboardingStore.getState().resetOnboarding();
+          useExchangeRatesStore.getState().fetchRates();
         } catch (_) {}
-
         if (fontsLoaded && isSupabaseConfigured() && supabase) {
           try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -143,7 +149,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <AppNavigator completeOnboarding={completeOnboarding} />
+        <AppNavigator completeOnboarding={completeOnboarding} initialRoute={initialRoute} />
       </NavigationContainer>
     </SafeAreaProvider>
   );

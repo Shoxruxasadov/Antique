@@ -27,6 +27,8 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
+import { useLocalCollectionStore, SAVED_COLLECTION_NAME, LOCAL_SAVED_ID } from '../../stores/useLocalCollectionStore';
+import { syncLocalCollectionToSupabase } from '../../lib/syncLocalCollection';
 import { formatPriceUsd } from '../../lib/currency';
 
 const THUMB_GAP = 7;
@@ -105,6 +107,8 @@ export default function CollectionScreen({ navigation, route }) {
   const displayCurrency = !rates && preferredCurrency !== 'USD' ? 'USD' : preferredCurrency;
   const rate = displayCurrency === 'USD' ? 1 : (rates?.[displayCurrency] ?? 1);
   const mainStack = navigation.getParent();
+  const rootStack = mainStack?.getParent?.();
+  const rootNav = rootStack?.getParent?.() ?? rootStack;
   const [activeTab, setActiveTab] = useState('details');
   const [collections, setCollections] = useState([]);
   const [snapHistory, setSnapHistory] = useState([]);
@@ -191,14 +195,26 @@ export default function CollectionScreen({ navigation, route }) {
 
   const FETCH_TIMEOUT_MS = 20000;
 
+  const loadLocalCollectionsAndHistory = useCallback(() => {
+    const state = useLocalCollectionStore.getState();
+    const saved = state.getLocalSavedCollection?.() ?? state.localSavedCollection;
+    const history = state.getLocalSnapHistory?.() ?? state.localSnapHistory ?? [];
+    setCollections(saved ? [saved] : []);
+    setSnapHistory(history);
+    const map = {};
+    history.forEach((s) => {
+      if (s.antique_id && (s.image_url || s.antique?.image_url)) map[s.antique_id] = s.image_url || s.antique?.image_url;
+    });
+    setAntiqueImageMap(map);
+    setLoading(false);
+    setFetchError(null);
+  }, []);
+
   const fetchCollectionsAndHistory = useCallback(async () => {
     const userId = user?.id;
     setFetchError(null);
     if (!userId || !isSupabaseConfigured() || !supabase) {
-      setCollections([]);
-      setSnapHistory([]);
-      setAntiqueImageMap({});
-      setLoading(false);
+      loadLocalCollectionsAndHistory();
       return;
     }
     setLoading(true);
@@ -230,7 +246,27 @@ export default function CollectionScreen({ navigation, route }) {
         setFetchError(snapRes.error.message || 'Snap history failed');
       }
 
-      const collList = collRes?.data ?? [];
+      let collList = collRes?.data ?? [];
+      const hasSaved = collList.some((c) => c.collection_name === SAVED_COLLECTION_NAME);
+      if (!hasSaved) {
+        const now = new Date().toISOString();
+        const { data: inserted } = await supabase
+          .from('collections')
+          .insert({
+            user_id: userId,
+            collection_name: SAVED_COLLECTION_NAME,
+            antiques_ids: [],
+            created_at: now,
+            updated_at: now,
+          })
+          .select('id, collection_name, antiques_ids')
+          .single();
+        if (inserted) collList = [inserted, ...collList];
+      } else {
+        collList = [...collList].sort((a, b) =>
+          (a.collection_name === SAVED_COLLECTION_NAME ? -1 : b.collection_name === SAVED_COLLECTION_NAME ? 1 : 0)
+        );
+      }
       const snapList = (snapRes?.data ?? []).slice().sort((a, b) => {
         const ca = a.created_at ?? '';
         const cb = b.created_at ?? '';
@@ -267,13 +303,20 @@ export default function CollectionScreen({ navigation, route }) {
       clearTimeout(timeoutId);
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, loadLocalCollectionsAndHistory]);
 
   useEffect(() => {
     const hadUser = prevUserIdRef.current;
     prevUserIdRef.current = user?.id;
     if (!hadUser && user?.id && isSupabaseConfigured() && supabase) {
-      fetchCollectionsAndHistory();
+      const localHistory = useLocalCollectionStore.getState().getLocalSnapHistory?.() ?? useLocalCollectionStore.getState().localSnapHistory ?? [];
+      if (localHistory.length > 0) {
+        syncLocalCollectionToSupabase(user.id).then((syncedCount) => {
+          if (syncedCount > 0) fetchCollectionsAndHistory();
+        });
+      } else {
+        fetchCollectionsAndHistory();
+      }
     }
   }, [user?.id, fetchCollectionsAndHistory]);
 
@@ -299,13 +342,18 @@ export default function CollectionScreen({ navigation, route }) {
       }
       returnedFromChildRef.current = false;
       if (!user?.id || !isSupabaseConfigured() || !supabase) {
-        setCollections([]);
-        setSnapHistory([]);
-        setLoading(false);
+        loadLocalCollectionsAndHistory();
         return;
       }
-      fetchCollectionsAndHistory();
-    }, [user?.id, fetchCollectionsAndHistory])
+      const localHistory = useLocalCollectionStore.getState().getLocalSnapHistory?.() ?? useLocalCollectionStore.getState().localSnapHistory ?? [];
+      if (localHistory.length > 0) {
+        syncLocalCollectionToSupabase(user.id).then((syncedCount) => {
+          if (syncedCount > 0) fetchCollectionsAndHistory();
+        });
+      } else {
+        fetchCollectionsAndHistory();
+      }
+    }, [user?.id, fetchCollectionsAndHistory, loadLocalCollectionsAndHistory])
   );
 
   useEffect(() => {
@@ -352,7 +400,8 @@ export default function CollectionScreen({ navigation, route }) {
 
   const handleDeleteSnap = useCallback(() => {
     const snapId = selectedSnap?.id;
-    if (!snapId || !supabase) return;
+    if (!snapId) return;
+    const isLocal = String(snapId).startsWith('local-');
     closeHistoryOptionsSheet(() => {
       Alert.alert(
         'Delete snap',
@@ -363,6 +412,12 @@ export default function CollectionScreen({ navigation, route }) {
             text: 'Delete',
             style: 'destructive',
             onPress: async () => {
+              if (isLocal || !user?.id) {
+                useLocalCollectionStore.getState().removeLocalSnap(snapId);
+                if (!user?.id) loadLocalCollectionsAndHistory();
+                else fetchCollectionsAndHistory();
+                return;
+              }
               try {
                 await supabase.from('snap_history').delete().eq('id', snapId);
                 fetchCollectionsAndHistory();
@@ -374,11 +429,15 @@ export default function CollectionScreen({ navigation, route }) {
         ]
       );
     });
-  }, [selectedSnap, closeHistoryOptionsSheet, supabase, fetchCollectionsAndHistory]);
+  }, [selectedSnap, closeHistoryOptionsSheet, supabase, user?.id, fetchCollectionsAndHistory, loadLocalCollectionsAndHistory]);
 
   const handleCreateSpace = async () => {
     const name = spaceName.trim();
     if (!name || !user?.id || !supabase) return;
+    if (name === SAVED_COLLECTION_NAME) {
+      Alert.alert('Reserved name', `"${SAVED_COLLECTION_NAME}" is the default collection name and cannot be used.`);
+      return;
+    }
     setCreating(true);
     try {
       const now = new Date().toISOString();
@@ -497,7 +556,13 @@ export default function CollectionScreen({ navigation, route }) {
           <Text style={styles.headerTitle}>Collections</Text>
           <Pressable
             style={styles.addBtn}
-            onPress={() => setShowCreateModal(true)}
+            onPress={() => {
+              if (!user?.id) {
+                rootNav?.reset({ index: 0, routes: [{ name: 'GetStarted' }] });
+                return;
+              }
+              setShowCreateModal(true);
+            }}
           >
             <Plus size={16} weight="bold" color={colors.textInverse} />
           </Pressable>
@@ -570,10 +635,20 @@ export default function CollectionScreen({ navigation, route }) {
                     thumbnails={getCollectionThumbnails(coll)}
                     onPress={() => {
                       returnedFromChildRef.current = true;
+                      const ids = coll.antiques_ids || [];
+                      let localItems;
+                      if (coll.id === LOCAL_SAVED_ID) {
+                        const history = useLocalCollectionStore.getState().getLocalSnapHistory?.() ?? useLocalCollectionStore.getState().localSnapHistory ?? [];
+                        const byId = {};
+                        history.forEach((s) => { if (s.antique) byId[s.antique_id] = s.antique; });
+                        localItems = [...ids].reverse().map((id) => byId[id]).filter(Boolean);
+                      }
                       mainStack?.navigate('CollectionDetail', {
                         collectionId: coll.id,
                         collectionName: coll.collection_name,
-                        antiquesIds: coll.antiques_ids || [],
+                        antiquesIds: ids,
+                        isSavedCollection: coll.collection_name === SAVED_COLLECTION_NAME,
+                        ...(localItems && { localItems }),
                       });
                     }}
                     styles={styles}
@@ -638,7 +713,10 @@ export default function CollectionScreen({ navigation, route }) {
                     <Pressable
                       style={styles.historyRow}
                       onPress={() => {
-                        if (snap.antique_id) {
+                        if (snap.antique) {
+                          returnedFromChildRef.current = true;
+                          mainStack?.navigate('ItemDetails', { antique: snap.antique, fromHistory: true });
+                        } else if (snap.antique_id) {
                           returnedFromChildRef.current = true;
                           mainStack?.navigate('ItemDetails', { antiqueId: snap.antique_id, fromHistory: true });
                         }

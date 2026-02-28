@@ -30,6 +30,7 @@ import {
 import { useColors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useLocalCollectionStore, LOCAL_SAVED_ID } from '../../stores/useLocalCollectionStore';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
 import { formatPriceUsd } from '../../lib/currency';
@@ -44,7 +45,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
   const rates = useExchangeRatesStore((s) => s.rates);
   const displayCurrency = !rates && preferredCurrency !== 'USD' ? 'USD' : preferredCurrency;
   const rate = displayCurrency === 'USD' ? 1 : (rates?.[displayCurrency] ?? 1);
-  const { collectionId, collectionName, antiquesIds } = route.params || {};
+  const { collectionId, collectionName, antiquesIds, isSavedCollection, localItems: localItemsParam } = route.params || {};
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState(collectionName || 'Collection');
@@ -300,7 +301,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
   );
 
   const handleRemoveItemFromCollection = useCallback(() => {
-    if (!selectedItem?.id || !collectionId || !supabase) return;
+    if (!selectedItem?.id || !collectionId) return;
     closeItemOptionsSheet(() => {
       Alert.alert(
         'Remove from collection',
@@ -311,6 +312,12 @@ export default function CollectionDetailScreen({ route, navigation }) {
             text: 'Remove',
             style: 'destructive',
             onPress: async () => {
+              if (collectionId === LOCAL_SAVED_ID) {
+                useLocalCollectionStore.getState().removeLocalSnap(selectedItem.id);
+                setItems((prev) => prev.filter((i) => i.id !== selectedItem.id));
+                return;
+              }
+              if (!supabase) return;
               try {
                 const newIds = (antiquesIds || []).filter((id) => id !== selectedItem.id);
                 const { error } = await supabase
@@ -340,6 +347,11 @@ export default function CollectionDetailScreen({ route, navigation }) {
 
   useFocusEffect(
     useCallback(() => {
+      if (localItemsParam !== undefined && Array.isArray(localItemsParam)) {
+        setItems(localItemsParam);
+        setLoading(false);
+        return;
+      }
       if (!collectionId || !isSupabaseConfigured() || !supabase) {
         setItems([]);
         setLoading(false);
@@ -373,7 +385,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
           setLoading(false);
         }
       })();
-    }, [collectionId, antiquesIds])
+    }, [collectionId, antiquesIds, localItemsParam])
   );
 
 
@@ -479,9 +491,11 @@ export default function CollectionDetailScreen({ route, navigation }) {
               <RowsIcon size={22} color={colors.brand} weight="bold" />
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => setShowOptionsSheet(true)}>
-            <DotsThreeOutlineIcon size={22} color={colors.textBase} weight="fill" />
-          </TouchableOpacity>
+          {!isSavedCollection && (
+            <TouchableOpacity style={styles.headerBtn} onPress={() => setShowOptionsSheet(true)}>
+              <DotsThreeOutlineIcon size={22} color={colors.textBase} weight="fill" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -540,7 +554,9 @@ export default function CollectionDetailScreen({ route, navigation }) {
                     style={styles.extendedCard}
                     onPress={() =>
                       navigation.navigate('ItemDetails', {
-                        antiqueId: item.id,
+                        ...(String(item.id).startsWith('local-')
+                          ? { antique: item }
+                          : { antiqueId: item.id }),
                         fromCollectionAntiquesIds: antiquesIds,
                         fromCollectionId: collectionId,
                       })
@@ -597,7 +613,9 @@ export default function CollectionDetailScreen({ route, navigation }) {
                   style={styles.itemRow}
                   onPress={() =>
                     navigation.navigate('ItemDetails', {
-                      antiqueId: item.id,
+                      ...(String(item.id).startsWith('local-')
+                        ? { antique: item }
+                        : { antiqueId: item.id }),
                       fromCollectionAntiquesIds: antiquesIds,
                       fromCollectionId: collectionId,
                     })
@@ -661,14 +679,23 @@ export default function CollectionDetailScreen({ route, navigation }) {
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle}>Options</Text>
-              <Pressable style={styles.sheetRow} onPress={openRename}>
-                <PencilSimpleIcon size={22} color={colors.textBase} weight='bold' />
-                <Text style={styles.sheetRowText}>Rename</Text>
-              </Pressable>
-              <Pressable style={styles.sheetRow} onPress={handleDeleteCollection}>
-                <Trash size={22} color={colors.red} weight='bold' />
-                <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Delete collection</Text>
-              </Pressable>
+              {!isSavedCollection && (
+                <>
+                  <Pressable style={styles.sheetRow} onPress={openRename}>
+                    <PencilSimpleIcon size={22} color={colors.textBase} weight='bold' />
+                    <Text style={styles.sheetRowText}>Rename</Text>
+                  </Pressable>
+                  <Pressable style={styles.sheetRow} onPress={handleDeleteCollection}>
+                    <Trash size={22} color={colors.red} weight='bold' />
+                    <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Delete collection</Text>
+                  </Pressable>
+                </>
+              )}
+              {isSavedCollection && (
+                <Text style={[styles.sheetRowText, styles.sheetRowSubtext, { paddingVertical: 14 }]}>
+                  Saved collection cannot be renamed or deleted.
+                </Text>
+              )}
             </Pressable>
           </Animated.View>
         </View>

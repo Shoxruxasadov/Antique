@@ -447,7 +447,12 @@ export default function AntiqueScreen({ route, navigation }) {
   );
 
   const handleOpenAddSheet = () => {
-    if (!user?.id || !antique?.id) {
+    if (!user?.id) {
+      const rootNav = navigation.getParent?.();
+      rootNav?.reset?.({ index: 0, routes: [{ name: "GetStarted" }] });
+      return;
+    }
+    if (!antique?.id) {
       Alert.alert(
         "Login required",
         "Please sign in to add items to a collection.",

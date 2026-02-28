@@ -9,43 +9,28 @@ import {
   Animated,
   Easing,
   Dimensions,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft } from 'phosphor-react-native';
 import { useColors, fonts } from '../../theme';
+import { fetchBlogCategories, fetchBlogs } from '../../lib/blogApi';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TAB_ROW_PADDING = 16;
 
-const BLOG_TABS = ['Analyzing', 'News', 'Latest Posts'];
-
-const MOCK_POSTS = [
-  {
-    id: '1',
-    title: 'Understanding Antique Rarity: What Makes a Antique Valuable?',
-    readTime: '3 min read',
-    imageUrl: null,
-  },
-  {
-    id: '2',
-    title: 'Understanding Coin Rarity: What Makes a Coin Valuable?',
-    readTime: '5 min read',
-    imageUrl: null,
-  },
-  {
-    id: '3',
-    title: 'Caring for Vintage Porcelain and Ceramics',
-    readTime: '4 min read',
-    imageUrl: null,
-  },
-];
-
 function BlogCard({ post, onPress, styles }) {
+  const imageUrl = post.image_url;
   return (
     <Pressable style={styles.blogCard} onPress={() => onPress(post)}>
       <View style={styles.blogThumbWrap}>
-        <View style={[styles.blogThumb, styles.blogThumbEmpty]} />
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.blogThumb} resizeMode="cover" />
+        ) : (
+          <View style={[styles.blogThumb, styles.blogThumbEmpty]} />
+        )}
       </View>
       <View style={styles.blogCardBody}>
         <Text style={styles.blogCardTitle} numberOfLines={2}>
@@ -63,10 +48,46 @@ const INDICATOR_EASING = Easing.bezier(0.33, 1, 0.68, 1);
 export default function AllPostsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const colors = useColors();
+  const [categories, setCategories] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
-  const tabLayouts = useRef(Array(BLOG_TABS.length).fill(null));
+  const tabLayouts = useRef([]);
   const indicatorLeft = useRef(new Animated.Value(0)).current;
   const indicatorWidth = useRef(new Animated.Value(0)).current;
+
+  const tabs = useMemo(() => {
+    const list = [{ id: null, name: 'All' }];
+    categories.forEach((c) => list.push({ id: c.id, name: c.name }));
+    return list;
+  }, [categories]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const list = await fetchBlogCategories();
+      if (!cancelled) setCategories(list);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    tabLayouts.current = Array(tabs.length).fill(null);
+  }, [tabs.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const categoryId = activeTab === 0 ? null : categories[activeTab - 1]?.id ?? null;
+    (async () => {
+      const list = await fetchBlogs({ categoryId });
+      if (!cancelled) {
+        setPosts(list);
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, categories]);
 
   const styles = useMemo(
     () =>
@@ -92,6 +113,8 @@ export default function AllPostsScreen({ navigation }) {
         blogCardBody: { flex: 1, minWidth: 0 },
         blogCardTitle: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase, marginBottom: 4 },
         blogCardMeta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
+        emptyCard: { backgroundColor: colors.bgWhite, borderRadius: 20, padding: 32, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
+        emptyCardText: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
       }),
     [colors]
   );
@@ -143,18 +166,17 @@ export default function AllPostsScreen({ navigation }) {
       </View>
 
       <View style={styles.tabRow}>
-        {/* Rels: to‘liq ekran enidagi chiziq, indicator ustida harakatlanadi */}
         <View style={styles.tabRail} />
         <View style={styles.tabRowInner}>
-          {BLOG_TABS.map((label, idx) => (
+          {tabs.map((tab, idx) => (
             <Pressable
-              key={label}
+              key={tab.id ?? 'all'}
               style={styles.tab}
               onLayout={(e) => handleTabLayout(idx, e)}
               onPress={() => setActiveTab(idx)}
             >
               <Text style={[styles.tabText, activeTab === idx && styles.tabTextActive]}>
-                {label}
+                {tab.name}
               </Text>
             </Pressable>
           ))}
@@ -175,14 +197,24 @@ export default function AllPostsScreen({ navigation }) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {MOCK_POSTS.map((post) => (
-          <BlogCard
-            key={post.id}
-            post={post}
-            onPress={(p) => navigation.navigate('Post', { post: p })}
-            styles={styles}
-          />
-        ))}
+        {loading ? (
+          <View style={styles.emptyCard}>
+            <ActivityIndicator size="small" color={colors.brand} />
+          </View>
+        ) : posts.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyCardText}>No posts yet</Text>
+          </View>
+        ) : (
+          posts.map((post) => (
+            <BlogCard
+              key={post.id}
+              post={post}
+              onPress={(p) => navigation.navigate('Post', { post: p })}
+              styles={styles}
+            />
+          ))
+        )}
       </ScrollView>
     </View>
   );

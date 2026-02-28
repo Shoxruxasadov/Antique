@@ -32,6 +32,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import { useColors, fonts } from "../../theme";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useAppSettingsStore } from "../../stores/useAppSettingsStore";
+import { useLocalCollectionStore } from "../../stores/useLocalCollectionStore";
 import { triggerHaptic } from "../../lib/haptics";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { analyzeAntiqueImage } from "../../lib/gemini";
@@ -434,6 +435,22 @@ export default function ScannerScreen({ navigation }) {
         if (cancelled) return;
 
         if (!userId) {
+          const payload = {
+            ...geminiResult,
+            market_value_min,
+            market_value_max,
+            avg_growth_percentage,
+            ...(geminiResult.estimated_market_value_usd != null
+              ? { estimated_market_value_usd: Number(geminiResult.estimated_market_value_usd) }
+              : {}),
+            ...(Array.isArray(ebayLinks) && ebayLinks.length > 0 ? { ebay_links: ebayLinks } : {}),
+          };
+          const localId = useLocalCollectionStore.getState().addLocalScan(
+            { ...antiqueRow, user_id: null },
+            payload,
+            scanImageUri || null,
+            scanBase64 || null
+          );
           setShowScanModal(false);
           navigation.reset({
             index: 1,
@@ -442,7 +459,7 @@ export default function ScannerScreen({ navigation }) {
               {
                 name: "ItemDetails",
                 params: {
-                  antique: { ...antiqueRow, id: null },
+                  antique: { ...antiqueRow, id: localId, user_id: null },
                   fromScan: true,
                 },
               },

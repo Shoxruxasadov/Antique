@@ -8,10 +8,10 @@ import MainStack from './MainStack';
 
 const Stack = createNativeStackNavigator();
 
-export default function AppNavigator({ completeOnboarding }) {
+export default function AppNavigator({ completeOnboarding, initialRoute = 'Onboarding' }) {
   return (
     <Stack.Navigator
-      initialRouteName="Onboarding"
+      initialRouteName={initialRoute}
       screenOptions={{
         headerShown: false,
       }}

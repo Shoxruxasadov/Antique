@@ -7,6 +7,8 @@ import {
   Image,
   Dimensions,
   Animated,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +16,7 @@ import { X, Check } from 'phosphor-react-native';
 import { openTermsOfUse, openPrivacyPolicy } from '../../lib/legalLinks';
 import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
 import { fonts } from '../../theme';
+import { getPackageToPurchase, purchasePackage, restorePurchases } from '../../lib/revenueCat';
 
 const COUNTDOWN_MS = 3000;
 const PROGRESS_SIZE = 32;
@@ -48,8 +51,9 @@ const FEATURES = [
 
 export default function ProScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [plan, setPlan] = useState('monthly'); // 'monthly' | 'annual'
+  const [plan, setPlan] = useState('weekly'); // 'weekly' | 'annual'
   const [showClose, setShowClose] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const closeOpacity = useRef(new Animated.Value(0)).current;
   const progressOpacity = useRef(new Animated.Value(1)).current;
@@ -150,16 +154,16 @@ export default function ProScreen({ navigation }) {
 
         <View style={styles.planRow}>
           <Pressable
-            style={[styles.planCard, plan === 'monthly' && styles.planCardSelected]}
-            onPress={() => setPlan('monthly')}
+            style={[styles.planCard, plan === 'weekly' && styles.planCardSelected]}
+            onPress={() => setPlan('weekly')}
           >
-            <View style={[styles.planCardBadge, plan === 'monthly' && styles.planCardBadgeSelected]}>
-              {plan === 'monthly' ? (
+            <View style={[styles.planCardBadge, plan === 'weekly' && styles.planCardBadgeSelected]}>
+              {plan === 'weekly' ? (
                 <Check size={14} color={PRO_DARK.bg} weight="bold" />
               ) : null}
             </View>
-            <Text style={styles.planTitle}>Monthly</Text>
-            <Text style={styles.planSub}>3 day free trial</Text>
+            <Text style={styles.planTitle}>Weekly</Text>
+            <Text style={styles.planSub}>USD$4.99/week</Text>
           </Pressable>
 
           <Pressable
@@ -172,21 +176,48 @@ export default function ProScreen({ navigation }) {
               ) : null}
             </View>
             <Text style={styles.planTitle}>Annual</Text>
-            <Text style={styles.planSub}>3 day free trial</Text>
+            <Text style={styles.planSub}>USD$29.99/year</Text>
           </Pressable>
         </View>
 
-        <Text style={styles.pricingNote}>1st month $0.99, then just $3.99/month</Text>
+        <Text style={styles.pricingNote}>{plan === 'annual' ? 'USD$29.99/year, cancel anytime' : '3 days free trial, then just USD$4.99/week'}</Text>
 
-        <Pressable style={styles.ctaBtn}>
-          <Text style={styles.ctaBtnText}>Start 3 day free trial</Text>
+        <Pressable
+          style={[styles.ctaBtn, purchasing && styles.ctaBtnDisabled]}
+          onPress={async () => {
+            if (purchasing) return;
+            setPurchasing(true);
+            try {
+              const pkg = await getPackageToPurchase(plan);
+              if (!pkg) {
+                Alert.alert('Error', 'No package available for purchase', [{ text: 'Ok' }]);
+                return;
+              }
+              await purchasePackage(pkg);
+              navigation.goBack();
+            } catch (e) {
+              if (e?.userCancelled ?? e?.code === 'PURCHASE_CANCELLED') return;
+              Alert.alert('Error', e?.message || 'Purchase failed');
+            } finally {
+              setPurchasing(false);
+            }
+          }}
+          disabled={purchasing}
+        ><Text style={styles.ctaBtnText}>CONTINUE</Text>
         </Pressable>
 
         <View style={styles.footer}>
           <Pressable onPress={openTermsOfUse}>
             <Text style={styles.footerLink}>Terms of Use</Text>
           </Pressable>
-          <Pressable onPress={() => {}}>
+          <Pressable
+            onPress={async () => {
+              try {
+                await restorePurchases();
+                navigation.goBack();
+              } catch (_) {}
+            }}
+          >
             <Text style={styles.footerLink}>Restore</Text>
           </Pressable>
           <Pressable onPress={openPrivacyPolicy}>
@@ -348,6 +379,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     marginBottom: 20,
+  },
+  ctaBtnDisabled: {
+    opacity: 0.7,
   },
   ctaBtnText: {
     fontFamily: fonts.semiBold,

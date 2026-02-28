@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { StyleSheet, View, Text, Pressable, Image, Alert, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CaretRight, Envelope, AppleLogo, GoogleLogo } from 'phosphor-react-native';
+import { CaretRight } from 'phosphor-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useColors, fonts } from '../../theme';
 import { useOnboardingStore } from '../../stores/useOnboardingStore';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -55,15 +56,15 @@ export default function GetStartedScreen({ navigation }) {
         subtitle: { fontFamily: fonts.regular, fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 32, paddingHorizontal: 16 },
         btnDisabled: { opacity: 0.7 },
         btnApple: { flexDirection: 'row', width: '100%', backgroundColor: colors.bgInverted, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
-        btnAppleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textWhite },
-        btnEmail: { flexDirection: 'row', width: '100%', backgroundColor: colors.bgBase, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
+        btnAppleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textInverse },
+        btnEmail: { flexDirection: 'row', width: '100%', backgroundColor: colors.border1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
         btnEmailText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase },
-        btnGoogle: { flexDirection: 'row', width: '100%', backgroundColor: colors.bgBase, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 24 },
+        btnGoogle: { flexDirection: 'row', width: '100%', backgroundColor: colors.border1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 24 },
         btnGoogleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase },
         footerRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' },
         footerLabel: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary },
         footerLink: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.textBrand },
-        legalFooter: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', marginTop: 20, paddingHorizontal: 8 },
+        legalFooter: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16,},
         legalFooterText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
         legalFooterLink: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textBrand },
       }),
@@ -71,7 +72,7 @@ export default function GetStartedScreen({ navigation }) {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       <Pressable style={styles.skipBtn} onPress={handleSkip}>
@@ -80,7 +81,7 @@ export default function GetStartedScreen({ navigation }) {
       </Pressable>
 
       <View style={styles.content}>
-        <Image source={require('../../assets/icon.png')} style={styles.icon} resizeMode="contain" />
+        <Image source={require('../../assets/logo.png')} style={styles.icon} resizeMode="contain" />
         <Text style={styles.title}>Sign Up</Text>
         <Text style={styles.subtitle}>
           To continue using our app, please login to your account
@@ -92,9 +93,9 @@ export default function GetStartedScreen({ navigation }) {
           disabled={!!oauthLoading}
         >
           {oauthLoading === 'apple' ? (
-            <ActivityIndicator color={colors.textWhite} size="small" />
+            <ActivityIndicator color={colors.textInverse} size="small" />
           ) : (
-            <AppleLogo size={ICON_SIZE} color={colors.textWhite} />
+            <Ionicons name="logo-apple" size={ICON_SIZE} color={colors.textInverse} />
           )}
           <Text style={styles.btnAppleText}>
             {oauthLoading === 'apple' ? 'Signing in…' : 'Continue with Apple'}
@@ -105,7 +106,7 @@ export default function GetStartedScreen({ navigation }) {
           style={styles.btnEmail}
           onPress={() => navigation.navigate('SignUp')}
         >
-          <Envelope size={ICON_SIZE} color={colors.textBase} weight="regular" />
+          <Ionicons name="mail" size={ICON_SIZE} color={colors.textBase} />
           <Text style={styles.btnEmailText}>Continue with Email</Text>
         </Pressable>
 
@@ -117,7 +118,7 @@ export default function GetStartedScreen({ navigation }) {
           {oauthLoading === 'google' ? (
             <ActivityIndicator color={colors.textBase} size="small" />
           ) : (
-            <GoogleLogo size={ICON_SIZE} color={colors.textBase} />
+            <Image source={require('../../assets/google.webp')} style={{ width: 19, height: 19, margin: 1.5, marginRight: 0 }} resizeMode="contain" />
           )}
           <Text style={styles.btnGoogleText}>
             {oauthLoading === 'google' ? 'Signing in…' : 'Continue with Google'}
@@ -130,18 +131,18 @@ export default function GetStartedScreen({ navigation }) {
             <Text style={styles.footerLink}>Log In</Text>
           </Pressable>
         </View>
+      </View>
 
-        <View style={styles.legalFooter}>
-          <Text style={styles.legalFooterText}>By continuing, you agree to our </Text>
-          <Pressable onPress={openTermsOfUse}>
-            <Text style={styles.legalFooterLink}>Terms of Use</Text>
-          </Pressable>
-          <Text style={styles.legalFooterText}> and </Text>
-          <Pressable onPress={openPrivacyPolicy}>
-            <Text style={styles.legalFooterLink}>Privacy Policy</Text>
-          </Pressable>
-          <Text style={styles.legalFooterText}>.</Text>
-        </View>
+      <View style={[styles.legalFooter, { paddingBottom: insets.bottom + 16 }]}>
+        <Text style={styles.legalFooterText}>By continuing, you agree to our </Text>
+        <Pressable onPress={openTermsOfUse}>
+          <Text style={styles.legalFooterLink}>Terms of Use</Text>
+        </Pressable>
+        <Text style={styles.legalFooterText}> and </Text>
+        <Pressable onPress={openPrivacyPolicy}>
+          <Text style={styles.legalFooterLink}>Privacy Policy</Text>
+        </Pressable>
+        <Text style={styles.legalFooterText}>.</Text>
       </View>
     </View>
   );

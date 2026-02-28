@@ -153,7 +153,7 @@ export default function ProfileScreen({ navigation }) {
           width: 56,
           height: 56,
           borderRadius: 28,
-          backgroundColor: colors.border3,
+          backgroundColor: colors.border1,
           justifyContent: "center",
           alignItems: "center",
           marginRight: 16,
