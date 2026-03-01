@@ -53,19 +53,19 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Antique to access your camera"
+          "cameraPermission": "Allow AntiqPro to access your camera"
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Antique to access your photos for the last photo preview."
+          "photosPermission": "Allow AntiqPro to access your photos for the last photo preview."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Antique to access your photos."
+          "photosPermission": "Allow AntiqPro to access your photos."
         }
       ],
       "expo-web-browser"
