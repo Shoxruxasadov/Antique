@@ -182,7 +182,7 @@ export default function ProfileScreen({ navigation }) {
         },
         loginBtn: {
           backgroundColor: colors.brand,
-          paddingVertical: 12,
+          paddingVertical: 10,
           paddingHorizontal: 20,
           borderRadius: 12,
         },
