@@ -27,6 +27,7 @@ try {
 
 const FONT_LOAD_TIMEOUT_MS = 12000;
 const PREPARE_TIMEOUT_MS = 15000;
+const SPLASH_MIN_MS = 2000;
 
 export default function App() {
   const [appReady, setAppReady] = useState(false);
@@ -36,6 +37,7 @@ export default function App() {
   const hasSkippedGetStarted = useOnboardingStore((s) => s.hasSkippedGetStarted);
   const user = useAuthStore((s) => s.user);
   const timedOut = useRef(false);
+  const splashStartRef = useRef(Date.now());
 
   const initialRoute =
     !hasSeenOnboarding ? 'Onboarding' : user || hasSkippedGetStarted ? 'Main' : 'GetStarted';
@@ -126,9 +128,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (appReady) {
+    if (!appReady) return;
+    const elapsed = Date.now() - splashStartRef.current;
+    const delay = Math.max(0, SPLASH_MIN_MS - elapsed);
+    const id = setTimeout(() => {
       SplashScreen.hideAsync?.().catch(() => {});
-    }
+    }, delay);
+    return () => clearTimeout(id);
   }, [appReady]);
 
   // Xato bo‘lsa faqat matn ko‘rsatamiz (theme ga bog‘liq emas)

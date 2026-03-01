@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, DotsThreeOutlineVerticalIcon, Trash } from 'phosphor-react-native';
 import { useColors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { checkIsPro } from '../../lib/revenueCat';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
@@ -118,6 +119,7 @@ export default function CollectionScreen({ navigation, route }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [spaceName, setSpaceName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   const [showHistoryOptionsSheet, setShowHistoryOptionsSheet] = useState(false);
   const [selectedSnap, setSelectedSnap] = useState(null);
   const [focusKey, setFocusKey] = useState(0);
@@ -356,6 +358,12 @@ export default function CollectionScreen({ navigation, route }) {
     }, [user?.id, fetchCollectionsAndHistory, loadLocalCollectionsAndHistory])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      checkIsPro().then(setIsPro);
+    }, [])
+  );
+
   useEffect(() => {
     if (!showHistoryOptionsSheet) return;
     const h = Dimensions.get('window').height;
@@ -557,6 +565,10 @@ export default function CollectionScreen({ navigation, route }) {
           <Pressable
             style={styles.addBtn}
             onPress={() => {
+              if (!isPro) {
+                mainStack?.navigate('Pro', { fromCollection: true });
+                return;
+              }
               if (!user?.id) {
                 rootNav?.reset({ index: 0, routes: [{ name: 'GetStarted' }] });
                 return;

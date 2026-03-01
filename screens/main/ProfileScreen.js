@@ -184,7 +184,7 @@ export default function ProfileScreen({ navigation }) {
           backgroundColor: colors.brand,
           paddingVertical: 10,
           paddingHorizontal: 20,
-          borderRadius: 12,
+          borderRadius: 10,
         },
         loginBtnText: {
           fontFamily: fonts.semiBold,

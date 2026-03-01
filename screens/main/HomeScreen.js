@@ -665,7 +665,8 @@ export default function HomeScreen({ navigation }) {
           </View>
         </Animated.View>
 
-        {/* Row 1: Snap History — card 2 */}
+        {/* Row 1: Snap History — card 2 (faqat skanlar bo‘lsa ko‘rinadi) */}
+        {lastSnaps.length > 0 && (
         <Animated.View
           style={{
             opacity: cardAnims[2].opacity,
@@ -679,20 +680,7 @@ export default function HomeScreen({ navigation }) {
             contentContainerStyle={styles.snapRowContent}
             style={styles.snapRowScroll}
           >
-            {lastSnaps.length === 0 ? (
-              <Pressable
-                style={[styles.snapEmptyCard, { width: width - 32 }]}
-                onPress={() => {
-                  useAppSettingsStore
-                    .getState()
-                    .setOpenCollectionToHistory(true);
-                  navigation.navigate("Collection");
-                }}
-              >
-                <Text style={styles.snapEmptyText}>No scans yet</Text>
-              </Pressable>
-            ) : (
-              lastSnaps.map((snap) => {
+            {lastSnaps.map((snap) => {
                 const category = Array.isArray(snap.payload?.category)
                   ? snap.payload.category.join(", ")
                   : snap.payload?.category || "Antique";
@@ -767,10 +755,8 @@ export default function HomeScreen({ navigation }) {
                     </Pressable>
                   </Pressable>
                 );
-              })
-            )}
-            {lastSnaps.length > 0 && (
-              <Pressable
+              })}
+            <Pressable
                 style={[
                   styles.seeAllBtn,
                   { width: snapCardWidth * 0.32, marginRight: 0 },
@@ -787,9 +773,9 @@ export default function HomeScreen({ navigation }) {
                 </View>
                 <Text style={styles.seeAllText}>See All</Text>
               </Pressable>
-            )}
           </ScrollView>
         </Animated.View>
+        )}
 
         {/* Row 2: Collectors Blog — card 3 */}
         <Animated.View
