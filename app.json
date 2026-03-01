@@ -68,7 +68,8 @@
           "photosPermission": "Allow AntiqPro to access your photos."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-localization"
     ],
     "owner": "webnum.com",
     "extra": {

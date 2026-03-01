@@ -3,6 +3,7 @@ import {
   StyleSheet,
   View,
   Pressable,
+  TouchableOpacity,
   Image,
   ImageBackground,
   useWindowDimensions,
@@ -10,6 +11,7 @@ import {
   Text,
   Animated,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -38,8 +40,17 @@ import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { analyzeAntiqueImage } from "../../lib/gemini";
 import { fetchMarketPricesFromEbay } from "../../lib/ebay";
 import { uploadSnapImage } from "../../lib/snapStorage";
+import { t } from "../../lib/i18n";
+import { checkIsPro } from "../../lib/revenueCat";
 
 const CAMERA_BORDER_RADIUS = 24;
+const FREE_SCANS_PER_DAY = 1;
+const SCAN_COUNT_KEY_PREFIX = "antique_scan_count_";
+
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 const SCAN_CORNER_SIZE = 40;
 const SCAN_BORDER_WIDTH = 4;
 
@@ -128,6 +139,8 @@ export default function ScannerScreen({ navigation }) {
   const [notAntique, setNotAntique] = useState(false);
   const [notAntiqueReason, setNotAntiqueReason] = useState(null);
   const [scanningDots, setScanningDots] = useState(0);
+  const [isPro, setIsPro] = useState(false);
+  const [remainingScans, setRemainingScans] = useState(FREE_SCANS_PER_DAY);
 
   const step1TranslateY = useRef(new Animated.Value(0)).current;
   const step2TranslateY = useRef(new Animated.Value(12)).current;
@@ -182,6 +195,22 @@ export default function ScannerScreen({ navigation }) {
         notAntiqueTitle: { fontFamily: fonts.semiBold, fontSize: 20, color: colors.textBase, marginTop: 16 },
         notAntiqueReason: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, textAlign: "center", marginTop: 8, lineHeight: 22 },
         backHint: { color: colors.brand, marginTop: 16, fontSize: 16 },
+        scansBarContainer: {
+          position: "absolute",
+          left: "4%",
+          right: "4%",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          borderRadius: 50,
+          backgroundColor: "#222222",
+          zIndex: 100,
+        },
+        scansBarText: { fontSize: 16, fontWeight: "700", color: "#ffffff" },
+        scansBarButton: { paddingHorizontal: 24, paddingVertical: 8, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.1)" },
+        scansBarButtonText: { fontSize: 16, fontWeight: "700", color: "#ffffff" },
       }),
     [colors]
   );
@@ -208,6 +237,19 @@ export default function ScannerScreen({ navigation }) {
     useCallback(() => {
       loadLastPhoto();
     }, [loadLastPhoto]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isPro) {
+        checkIsPro().then(setIsPro);
+      }
+      const key = SCAN_COUNT_KEY_PREFIX + getTodayStr();
+      AsyncStorage.getItem(key).then((val) => {
+        const count = val ? parseInt(val, 10) : 0;
+        setRemainingScans(Math.max(0, FREE_SCANS_PER_DAY - count));
+      });
+    }, []),
   );
 
   useEffect(() => {
@@ -451,6 +493,12 @@ export default function ScannerScreen({ navigation }) {
             scanImageUri || null,
             scanBase64 || null
           );
+          if (!isPro) {
+            const dayKey = SCAN_COUNT_KEY_PREFIX + getTodayStr();
+            const raw = await AsyncStorage.getItem(dayKey);
+            await AsyncStorage.setItem(dayKey, String((raw ? parseInt(raw, 10) : 0) + 1));
+            setRemainingScans((prev) => Math.max(0, prev - 1));
+          }
           setShowScanModal(false);
           navigation.reset({
             index: 1,
@@ -497,6 +545,12 @@ export default function ScannerScreen({ navigation }) {
         if (snapErr) throw snapErr;
         if (cancelled) return;
 
+        if (!isPro) {
+          const dayKey = SCAN_COUNT_KEY_PREFIX + getTodayStr();
+          const raw = await AsyncStorage.getItem(dayKey);
+          await AsyncStorage.setItem(dayKey, String((raw ? parseInt(raw, 10) : 0) + 1));
+          setRemainingScans((prev) => Math.max(0, prev - 1));
+        }
         setShowScanModal(false);
         navigation.reset({
           index: 1,
@@ -660,6 +714,23 @@ export default function ScannerScreen({ navigation }) {
           </View>
         </View>
       </View>
+
+      {!isPro && (
+        <View style={[styles.scansBarContainer, { bottom: insets.bottom + 150 }]}>
+          <Text style={styles.scansBarText}>
+            {t("scanner.scanLeft")}: {remainingScans}
+          </Text>
+          {navigation && (
+            <TouchableOpacity
+              style={styles.scansBarButton}
+              onPress={() => navigation.navigate("Pro", { fromScanner: true })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.scansBarButtonText}>{t("scanner.getMore")}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       <View
         style={[styles.bottomControls, { paddingBottom: insets.bottom + 20 }]}

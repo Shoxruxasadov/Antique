@@ -9,6 +9,7 @@ import {
   Easing,
   Image,
   Alert,
+  Linking,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
@@ -28,6 +29,7 @@ import {
 } from "phosphor-react-native";
 import { useColors, fonts } from "../../theme";
 import { requestAppReview } from "../../lib/requestAppReview";
+import { restorePurchases } from "../../lib/revenueCat";
 import { openPrivacyPolicy, openTermsOfUse } from "../../lib/legalLinks";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { useAuthStore } from "../../stores/useAuthStore";
@@ -285,6 +287,20 @@ export default function ProfileScreen({ navigation }) {
     }, [cardAnims, easeOut]),
   );
 
+  const handleRestore = useCallback(async () => {
+    const info = await restorePurchases();
+    if (info == null) {
+      Alert.alert("Error", "Could not restore purchases. Please try again.");
+      return;
+    }
+    const hasActive = info.entitlements?.active && Object.keys(info.entitlements.active).length > 0;
+    if (!hasActive) {
+      Alert.alert("No purchases to restore", "No previous membership found for this account.");
+      return;
+    }
+    Alert.alert("Success", "Membership restored.");
+  }, []);
+
   const navigateTo = (route) => {
     if (!route) return;
     if (route === "GetStarted" || route === "SignIn") {
@@ -407,7 +423,13 @@ export default function ProfileScreen({ navigation }) {
                 Icon={item.Icon}
                 label={item.label}
                 value={item.id === "currency" ? preferredCurrency : item.value}
-                onPress={item.route ? () => navigateTo(item.route) : undefined}
+                onPress={
+                  item.id === "restore"
+                    ? handleRestore
+                    : item.route
+                      ? () => navigateTo(item.route)
+                      : undefined
+                }
                 styles={styles}
                 colors={colors}
               />
@@ -432,14 +454,16 @@ export default function ProfileScreen({ navigation }) {
                 label={item.label}
                 onPress={
                   item.id === 'rate'
-                    ? () => requestAppReview()
+                    ? () => void requestAppReview()
                     : item.id === 'privacy'
                       ? openPrivacyPolicy
                       : item.id === 'terms'
                         ? openTermsOfUse
-                        : item.route
-                          ? () => navigateTo(item.route)
-                          : undefined
+                        : item.id === 'support'
+                          ? () => Linking.openURL('mailto:support@webnum.com')
+                          : item.route
+                            ? () => navigateTo(item.route)
+                            : undefined
                 }
                 styles={styles}
                 colors={colors}

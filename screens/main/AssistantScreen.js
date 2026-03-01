@@ -14,11 +14,13 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { CaretLeft, X, PaperPlaneRightIcon, ImageIcon } from "phosphor-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useColors, fonts } from "../../theme";
 import { useAssistantStore } from "../../stores/useAssistantStore";
 import { chatWithGemini } from "../../lib/gemini";
+import { checkIsPro } from "../../lib/revenueCat";
 
 const SUGGESTIONS = [
   "Affectable factors to antique item",
@@ -57,8 +59,16 @@ export default function AssistantScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [pendingImage, setPendingImage] = useState(null);
   const [imageCaption, setImageCaption] = useState("");
+  const [isPro, setIsPro] = useState(false);
 
-  const hasUserSentAny = messages.some((m) => m.role === "user");
+  useFocusEffect(
+    useCallback(() => {
+      checkIsPro().then(setIsPro);
+    }, []),
+  );
+
+  const userMessageCount = messages.filter((m) => m.role === "user").length;
+  const hasUserSentAny = userMessageCount > 0;
   const showSuggestions = !hasUserSentAny;
   const prevMessageCountRef = useRef(0);
 
@@ -120,6 +130,10 @@ export default function AssistantScreen({ navigation }) {
       const trimmed = (text || "").trim();
       const caption = (imageCaption || "").trim();
       if (!trimmed && !pendingImage) return;
+      if (!isPro && userMessageCount >= 1) {
+        navigation.navigate("Pro", { fromAssistant: true });
+        return;
+      }
       setInput("");
       const userText = trimmed || caption;
       const userMsg = {
@@ -174,7 +188,7 @@ export default function AssistantScreen({ navigation }) {
         setLoading(false);
       }
     },
-    [messages, addMessage, pendingImage, imageCaption],
+    [messages, addMessage, pendingImage, imageCaption, isPro, userMessageCount, navigation],
   );
 
   const onSend = () => {

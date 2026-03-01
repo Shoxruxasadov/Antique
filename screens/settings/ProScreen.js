@@ -212,10 +212,18 @@ export default function ProScreen({ navigation }) {
           </Pressable>
           <Pressable
             onPress={async () => {
-              try {
-                await restorePurchases();
-                navigation.goBack();
-              } catch (_) {}
+              const info = await restorePurchases();
+              if (info == null) {
+                Alert.alert('Error', 'Could not restore purchases. Please try again.');
+                return;
+              }
+              const hasActive = info.entitlements?.active && Object.keys(info.entitlements.active).length > 0;
+              if (!hasActive) {
+                Alert.alert('No purchases to restore', 'No previous membership found for this account.');
+                return;
+              }
+              Alert.alert('Success', 'Membership restored.');
+              navigation.goBack();
             }}
           >
             <Text style={styles.footerLink}>Restore</Text>

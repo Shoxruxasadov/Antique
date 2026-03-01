@@ -930,8 +930,10 @@ export default function AntiqueScreen({ route, navigation }) {
 
   const handleClose = async () => {
     if (fromScan && !hasShownRateAfterFirstScan) {
-      await requestAppReview();
       setHasShownRateAfterFirstScan(true);
+      await requestAppReview();
+      // Native review dialog ko‘rinsin, keyin back
+      await new Promise((r) => setTimeout(r, 400));
     }
     navigation.goBack();
   };
