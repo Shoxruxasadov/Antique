@@ -33,7 +33,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useLocalCollectionStore, LOCAL_SAVED_ID } from '../../stores/useLocalCollectionStore';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
-import { formatPriceUsd } from '../../lib/currency';
+import { formatPriceUsd, getDisplayMarketValueUsd } from '../../lib/currency';
 
 export default function CollectionDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -78,7 +78,9 @@ export default function CollectionDetailScreen({ route, navigation }) {
         headerTitle: { fontSize: 20, fontFamily: fonts.semiBold, color: colors.textBase, textAlign: 'center', maxWidth: '50%', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
         loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
         emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-        emptyText: { fontSize: 16, fontFamily: fonts.regular, color: colors.textSecondary },
+        emptyImage: { width: 160, height: 64, marginBottom: 24 },
+        emptyText: { fontSize: 16, fontFamily: fonts.semiBold, color: colors.textSecondary, textAlign: 'center', marginBottom: 40 },
+        emptySubtext: { fontSize: 14, fontFamily: fonts.regular, color: colors.textTertiary, textAlign: 'center', marginTop: 4 },
         scroll: { flex: 1 },
         scrollContent: { padding: 16, paddingTop: 4 },
         analyticsCard: { backgroundColor: colors.bgWhite, borderRadius: 16, padding: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, alignItems: 'center' },
@@ -389,12 +391,8 @@ export default function CollectionDetailScreen({ route, navigation }) {
   );
 
 
-  // Har bir item uchun "Current market value" (antique sahifadagi bitta narx) — min > 0 ? min : Gemini estimated
-  const getItemCurrentMarketValue = (it) => {
-    const min = Number(it.market_value_min) || 0;
-    const est = it.specification?.estimated_market_value_usd != null ? Number(it.specification.estimated_market_value_usd) : null;
-    return min > 0 ? min : (est ?? 0);
-  };
+  // Antique sahifadagi "Current market value" bilan bir xil (eBay eng yaqin / o‘rtacha / min / Gemini)
+  const getItemCurrentMarketValue = (it) => getDisplayMarketValueUsd(it);
 
   const analytics = React.useMemo(() => {
     if (!items.length) return { total: 0, lowest: 0, highest: 0 };
@@ -505,7 +503,12 @@ export default function CollectionDetailScreen({ route, navigation }) {
         </View>
       ) : items.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyText}>No items in this collection</Text>
+          <Image
+            source={require('../../assets/emptypages/collection.png')}
+            style={styles.emptyImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.emptyText}>Collection is empty</Text>
         </View>
       ) : (
         <ScrollView
@@ -544,9 +547,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
                 const category = Array.isArray(item.category)
                   ? item.category.join(', ')
                   : (item.category || 'Antique');
-                const itemMin = item.market_value_min != null ? Number(item.market_value_min) : 0;
-                const itemEst = item.specification?.estimated_market_value_usd != null ? Number(item.specification.estimated_market_value_usd) : null;
-                const itemCurrent = itemMin > 0 ? itemMin : (itemEst ?? (item.market_value_max != null ? Number(item.market_value_max) : 0));
+                const itemCurrent = getDisplayMarketValueUsd(item);
                 const priceStr = itemCurrent > 0 ? formatPriceUsd(itemCurrent, displayCurrency, rate) : '';
                 return (
                   <Pressable
@@ -603,9 +604,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
               const category = Array.isArray(item.category)
                 ? item.category.join(', ')
                 : (item.category || 'Antique');
-              const itemMin = item.market_value_min != null ? Number(item.market_value_min) : 0;
-              const itemEst = item.specification?.estimated_market_value_usd != null ? Number(item.specification.estimated_market_value_usd) : null;
-              const itemCurrent = itemMin > 0 ? itemMin : (itemEst ?? (item.market_value_max != null ? Number(item.market_value_max) : 0));
+              const itemCurrent = getDisplayMarketValueUsd(item);
               const priceStr = itemCurrent > 0 ? formatPriceUsd(itemCurrent, displayCurrency, rate) : '';
               return (
                 <Pressable
@@ -721,15 +720,17 @@ export default function CollectionDetailScreen({ route, navigation }) {
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle}>Options</Text>
-              <Pressable
-                style={styles.sheetRow}
-                onPress={() => {
-                  closeItemOptionsSheet(() => setShowChangeSpaceSheet(true));
-                }}
-              >
-                <ArrowsClockwiseIcon size={22} color={colors.textBase} weight='bold' />
-                <Text style={styles.sheetRowText}>Change space</Text>
-              </Pressable>
+              {user?.id ? (
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => {
+                    closeItemOptionsSheet(() => setShowChangeSpaceSheet(true));
+                  }}
+                >
+                  <ArrowsClockwiseIcon size={22} color={colors.textBase} weight='bold' />
+                  <Text style={styles.sheetRowText}>Change space</Text>
+                </Pressable>
+              ) : null}
               <Pressable style={styles.sheetRow} onPress={handleRemoveItemFromCollection}>
                 <Trash size={22} color={colors.red} />
                 <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Remove from collection</Text>

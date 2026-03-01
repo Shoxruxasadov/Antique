@@ -26,7 +26,7 @@ function createStyles(colors) {
     container: { flex: 1, backgroundColor: colors.bgBase },
     imageArea: { width: '100%', backgroundColor: colors.bgBase },
     heroImage: { width: '100%', backgroundColor: colors.bgSurface },
-    placeholderImage: {},
+    placeholderImage: { backgroundColor: colors.border3 },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -261,11 +261,20 @@ export default function PostScreen({ route, navigation }) {
 
       <View style={[styles.imageArea, { height: IMAGE_SIZE }]}>
         {post.image_url ? (
-          <Image
-            source={{ uri: post.image_url }}
-            style={[styles.heroImage, { width: IMAGE_SIZE, height: IMAGE_SIZE }]}
-            resizeMode="cover"
-          />
+          <>
+            <View
+              style={[
+                styles.heroImage,
+                styles.placeholderImage,
+                { width: IMAGE_SIZE, height: IMAGE_SIZE, position: 'absolute' },
+              ]}
+            />
+            <Image
+              source={{ uri: post.image_url }}
+              style={[styles.heroImage, { width: IMAGE_SIZE, height: IMAGE_SIZE }]}
+              resizeMode="cover"
+            />
+          </>
         ) : (
           <View
             style={[

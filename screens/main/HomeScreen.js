@@ -27,7 +27,8 @@ import { useColors, fonts } from "../../theme";
 import { useAppSettingsStore } from "../../stores/useAppSettingsStore";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useExchangeRatesStore } from "../../stores/useExchangeRatesStore";
-import { formatPriceUsd } from "../../lib/currency";
+import { useLocalCollectionStore } from "../../stores/useLocalCollectionStore";
+import { formatPriceUsd, getDisplayMarketValueUsd } from "../../lib/currency";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { fetchLatestBlogs } from "../../lib/blogApi";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
@@ -440,8 +441,10 @@ export default function HomeScreen({ navigation }) {
   );
 
   const handleDeleteSnap = useCallback(() => {
-    const snapId = selectedSnap?.id;
-    if (!snapId || !supabase) return;
+    const snap = selectedSnap;
+    const snapId = snap?.id;
+    if (!snapId) return;
+    const isLocal = Boolean(snap?.antique);
     closeHistoryOptionsSheet(() => {
       Alert.alert(
         "Remove from history",
@@ -452,11 +455,16 @@ export default function HomeScreen({ navigation }) {
             text: "Remove",
             style: "destructive",
             onPress: async () => {
-              try {
-                await supabase.from("snap_history").delete().eq("id", snapId);
+              if (isLocal) {
+                useLocalCollectionStore.getState().removeLocalSnap?.(snapId);
                 setLastSnaps((prev) => prev.filter((s) => s.id !== snapId));
-              } catch (err) {
-                console.warn("Delete snap failed:", err?.message);
+              } else if (supabase) {
+                try {
+                  await supabase.from("snap_history").delete().eq("id", snapId);
+                  setLastSnaps((prev) => prev.filter((s) => s.id !== snapId));
+                } catch (err) {
+                  console.warn("Delete snap failed:", err?.message);
+                }
               }
             },
           },
@@ -531,32 +539,53 @@ export default function HomeScreen({ navigation }) {
     }, []),
   );
 
-  useEffect(() => {
-    if (!user?.id || !isSupabaseConfigured() || !supabase) {
-      setLastSnaps([]);
-      return;
-    }
-    (async () => {
-      try {
-        const { data } = await supabase
-          .from("snap_history")
-          .select("id, image_url, antique_id, payload, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(3);
-        const sorted = (data ?? []).slice().sort((a, b) => {
-          const ca = a.created_at ?? "";
-          const cb = b.created_at ?? "";
-          const byTime = cb.localeCompare(ca);
-          if (byTime !== 0) return byTime;
-          return String(b.id ?? "").localeCompare(String(a.id ?? ""));
-        });
-        setLastSnaps(sorted);
-      } catch (_) {
-        setLastSnaps([]);
-      }
-    })();
-  }, [user?.id]);
+  const HOME_SNAP_LIMIT = 3;
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const localHistory =
+          useLocalCollectionStore.getState().getLocalSnapHistory?.() ??
+          useLocalCollectionStore.getState().localSnapHistory ??
+          [];
+        const localSnaps = localHistory.slice(0, 20).map((s) => ({
+          id: s.id,
+          image_url: s.image_url || s.antique?.image_url || null,
+          antique_id: s.antique_id,
+          payload: s.payload || {},
+          created_at: s.created_at,
+          antique: s.antique ?? undefined,
+        }));
+
+        if (!user?.id || !isSupabaseConfigured() || !supabase) {
+          const sorted = localSnaps
+            .slice()
+            .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+          if (!cancelled) setLastSnaps(sorted.slice(0, HOME_SNAP_LIMIT));
+          return;
+        }
+        try {
+          const { data } = await supabase
+            .from("snap_history")
+            .select("id, image_url, antique_id, payload, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(20);
+          const serverSnaps = (data ?? []).map((r) => ({ ...r, antique: undefined }));
+          const merged = [...serverSnaps, ...localSnaps].sort((a, b) => {
+            const ca = a.created_at ?? "";
+            const cb = b.created_at ?? "";
+            return cb.localeCompare(ca);
+          });
+          if (!cancelled) setLastSnaps(merged.slice(0, HOME_SNAP_LIMIT));
+        } catch (_) {
+          if (!cancelled) setLastSnaps(localSnaps.slice(0, HOME_SNAP_LIMIT));
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [user?.id]),
+  );
 
   const snapCardWidth = width * 0.72;
   const blogCardWidth = width * 0.55;
@@ -684,19 +713,17 @@ export default function HomeScreen({ navigation }) {
                 const category = Array.isArray(snap.payload?.category)
                   ? snap.payload.category.join(", ")
                   : snap.payload?.category || "Antique";
-                const min = snap.payload?.market_value_min;
-                const max = snap.payload?.market_value_max;
-                const est = snap.payload?.estimated_market_value_usd;
-                const currentValue =
-                  min != null && Number(min) > 0
-                    ? Number(min)
-                    : max != null && Number(max) > 0
-                      ? Number(max)
-                      : est != null
-                        ? Number(est)
-                        : null;
+                const displayValueObj = {
+                  market_value_min: snap.payload?.market_value_min,
+                  market_value_max: snap.payload?.market_value_max,
+                  specification: {
+                    estimated_market_value_usd: snap.payload?.estimated_market_value_usd,
+                    ebay_items: snap.antique?.specification?.ebay_items,
+                  },
+                };
+                const currentValue = getDisplayMarketValueUsd(displayValueObj);
                 const priceStr =
-                  currentValue != null && currentValue > 0
+                  currentValue > 0
                     ? formatPriceUsd(currentValue, displayCurrency, rate)
                     : "";
                 return (
@@ -704,7 +731,15 @@ export default function HomeScreen({ navigation }) {
                     key={snap.id}
                     style={[styles.snapCard, { width: snapCardWidth }]}
                     onPress={() => {
-                      if (snap.antique_id) {
+                      if (snap.antique) {
+                        mainStack?.navigate("ItemDetails", {
+                          antique: {
+                            ...snap.antique,
+                            image_url: snap.antique?.image_url ?? snap.image_url ?? null,
+                          },
+                          fromHistory: true,
+                        });
+                      } else if (snap.antique_id) {
                         mainStack?.navigate("ItemDetails", {
                           antiqueId: snap.antique_id,
                           fromHistory: true,
@@ -803,7 +838,10 @@ export default function HomeScreen({ navigation }) {
                 <Pressable
                   key={post.id}
                   style={[styles.blogCard, { width: blogCardWidth }]}
-                  onPress={() => mainStack?.navigate("Post", { post })}
+                  onPress={() => {
+                    if (post.image_url) Image.prefetch(post.image_url);
+                    mainStack?.navigate("Post", { post });
+                  }}
                 >
                   <View style={styles.blogCardImageWrap}>
                     {post.image_url ? (

@@ -20,7 +20,8 @@
     "submit:ios": "npx eas submit --platform ios --profile production",
     "deploy:testflight": "npm run increment-build && npx eas build --platform ios --profile production --auto-submit",
     "dev:go": "npx expo start --clear --ios",
-    "dev:ios:metro": "concurrently -n metro,ios \"EXPO_OFFLINE=1 npx expo start --clear\" \"wait-on tcp:127.0.0.1:8081 -t 60000 && CI=false npx expo run:ios\""
+    "dev:ios:metro": "concurrently -n metro,ios \"EXPO_OFFLINE=1 npx expo start --clear\" \"wait-on tcp:127.0.0.1:8081 -t 60000 && CI=false npx expo run:ios\"",
+    "supabase:deploy-ebay": "npx supabase functions deploy ebay-search"
   },
   "dependencies": {
     "@expo-google-fonts/albert-sans": "^0.4.2",
@@ -62,6 +63,7 @@
   "devDependencies": {
     "@types/react": "~19.1.10",
     "concurrently": "^9.2.1",
+    "supabase": "^2.0.0",
     "typescript": "~5.9.2",
     "wait-on": "^9.0.4"
   },

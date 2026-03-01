@@ -23,11 +23,22 @@ const TAB_ROW_PADDING = 16;
 
 function BlogCard({ post, onPress, styles }) {
   const imageUrl = post.image_url;
+  const handlePress = () => {
+    if (imageUrl) Image.prefetch(imageUrl);
+    onPress(post);
+  };
   return (
-    <Pressable style={styles.blogCard} onPress={() => onPress(post)}>
+    <Pressable style={styles.blogCard} onPress={handlePress}>
       <View style={styles.blogThumbWrap}>
         {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.blogThumb} resizeMode="cover" />
+          <View style={{ width: 64, height: 64, position: 'relative' }}>
+            <View style={[styles.blogThumb, styles.blogThumbEmpty, StyleSheet.absoluteFill]} />
+            <Image
+              source={{ uri: imageUrl }}
+              style={[styles.blogThumb, StyleSheet.absoluteFill]}
+              resizeMode="cover"
+            />
+          </View>
         ) : (
           <View style={[styles.blogThumb, styles.blogThumbEmpty]} />
         )}
@@ -83,6 +94,12 @@ export default function AllPostsScreen({ navigation }) {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    posts.slice(0, 5).forEach((p) => {
+      if (p.image_url) Image.prefetch(p.image_url);
+    });
+  }, [posts]);
 
   const postsForTab = useMemo(() => {
     if (activeTab === 0) return posts;

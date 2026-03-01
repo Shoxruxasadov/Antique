@@ -913,11 +913,35 @@ export default function AntiqueScreen({ route, navigation }) {
     antique.specification?.estimated_market_value_high_usd != null
       ? Number(antique.specification.estimated_market_value_high_usd)
       : null;
-  // Current market value: eBay low yoki 0 bo‘lsa Gemini
+  // Current market value: Gemini estimate’ga eng yaqin eBay narxi; fallback — eBay listinglarining o‘rtacha narxi. (min+max)/2 hech qachon ishlatilmaydi
+  const minNum = antique.market_value_min != null ? Number(antique.market_value_min) : 0;
+  const maxNum = antique.market_value_max != null ? Number(antique.market_value_max) : 0;
+  const ebayItemsForPrice =
+    antique?.specification?.ebay_items?.length > 0
+      ? antique.specification.ebay_items
+      : [];
+  const ebayPrices = ebayItemsForPrice
+    .map((it) => (it?.price != null ? parseFloat(String(it.price)) : NaN))
+    .filter((p) => !Number.isNaN(p) && p > 0);
+  const ebayAvg =
+    ebayPrices.length > 0
+      ? ebayPrices.reduce((s, p) => s + p, 0) / ebayPrices.length
+      : 0;
+  const targetUsd = geminiEstimate ?? (ebayAvg || minNum || maxNum || 0);
+  const closestEbayPrice =
+    targetUsd > 0 && ebayPrices.length > 0
+      ? ebayPrices.reduce((best, p) =>
+          Math.abs(p - targetUsd) < Math.abs(best - targetUsd) ? p : best
+        )
+      : 0;
   const displayPriceUsd =
-    antique.market_value_min != null && Number(antique.market_value_min) > 0
-      ? Number(antique.market_value_min)
-      : (geminiEstimate ?? 0);
+    closestEbayPrice > 0
+      ? closestEbayPrice
+      : ebayAvg > 0
+        ? ebayAvg
+        : minNum > 0
+          ? minNum
+          : (geminiEstimate ?? 0);
   // Low / High: eBay dan; 0 bo‘lsa Gemini’dan (low_usd, high_usd yoki bitta estimated)
   const displayLowUsd =
     antique.market_value_min != null && Number(antique.market_value_min) > 0
@@ -1053,7 +1077,7 @@ export default function AntiqueScreen({ route, navigation }) {
             style={styles.contentScroll}
             contentContainerStyle={[
               styles.contentScrollContent,
-              { paddingBottom: insets.bottom + 70 },
+              { paddingBottom: isInCurrentCollection ? insets.bottom : insets.bottom + 70 },
             ]}
             showsVerticalScrollIndicator={false}
             onScroll={handleContentScroll}

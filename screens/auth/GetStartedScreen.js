@@ -81,7 +81,7 @@ export default function GetStartedScreen({ navigation }) {
       </Pressable>
 
       <View style={styles.content}>
-        <Image source={require('../../assets/logo.png')} style={styles.icon} resizeMode="contain" />
+        <Image source={require('../../assets/radial_logo.png')} style={styles.icon} resizeMode="contain" />
         <Text style={styles.title}>Sign Up</Text>
         <Text style={styles.subtitle}>
           To continue using our app, please login to your account

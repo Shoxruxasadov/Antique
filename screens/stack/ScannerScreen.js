@@ -39,6 +39,7 @@ import { triggerHaptic } from "../../lib/haptics";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { analyzeAntiqueImage } from "../../lib/gemini";
 import { fetchMarketPricesFromEbay } from "../../lib/ebay";
+import { fetchMarketEstimateWithWebSearch } from "../../lib/gemini";
 import { uploadSnapImage } from "../../lib/snapStorage";
 import { t } from "../../lib/i18n";
 import { checkIsPro } from "../../lib/revenueCat";
@@ -85,7 +86,9 @@ const SNAP_JPEG_QUALITY = 0.85;
  */
 async function resizeAndUploadSnap(imageUri, userId) {
   if (!userId || !imageUri) return imageUri;
-  const snapId = `snap_${Date.now()}`;
+  const snapId = userId === 'anonymous'
+    ? `snap_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+    : `snap_${Date.now()}`;
   try {
     const resized = await ImageManipulator.manipulateAsync(
       imageUri,
@@ -108,11 +111,12 @@ async function resizeAndUploadSnap(imageUri, userId) {
   }
 }
 
-/** Faqat Supabase Storage public URL qaytaradi; local file hech qachon DB ga yozilmasin */
+/** Supabase Storage public URL qaytaradi; login bo‘lmasa ham 'anonymous' path ga yuklaydi. Local file DB ga yozilmasin. */
 async function ensurePublicImageUrl(imageUri, base64, userId) {
-  if (!userId || !imageUri) return null;
+  if (!imageUri) return null;
   if (!isLocalFileUri(imageUri)) return imageUri;
-  const uploaded = await resizeAndUploadSnap(imageUri, userId);
+  const uid = userId ?? 'anonymous';
+  const uploaded = await resizeAndUploadSnap(imageUri, uid);
   return isLocalFileUri(uploaded) ? null : uploaded;
 }
 
@@ -379,14 +383,39 @@ export default function ScannerScreen({ navigation }) {
         await new Promise((r) => setTimeout(r, 500));
         if (cancelled) return;
 
-        const {
-          market_value_min,
-          market_value_max,
-          avg_growth_percentage,
-          image_urls: ebayImageUrls,
-          ebay_links: ebayLinks = [],
-          ebay_items: ebayItems = [],
-        } = await fetchMarketPricesFromEbay(geminiResult.search_keywords || []);
+        let market_value_min;
+        let market_value_max;
+        let market_value_median;
+        let avg_growth_percentage;
+        let ebayLinks = [];
+        let ebayItems = [];
+        const ebayResult = await fetchMarketPricesFromEbay(geminiResult.search_keywords || []);
+        if (cancelled) return;
+        market_value_min = ebayResult?.market_value_min ?? 0;
+        market_value_max = ebayResult?.market_value_max ?? 0;
+        market_value_median = ebayResult?.market_value_median ?? 0;
+        avg_growth_percentage = ebayResult?.avg_growth_percentage ?? 0;
+        ebayLinks = Array.isArray(ebayResult?.ebay_links) ? ebayResult.ebay_links : [];
+        ebayItems = Array.isArray(ebayResult?.ebay_items) ? ebayResult.ebay_items : [];
+
+        const ebayEmpty = ebayItems.length === 0 && (market_value_min == null || Number(market_value_min) <= 0) && (market_value_max == null || Number(market_value_max) <= 0);
+        if (ebayEmpty) {
+          try {
+            const webResult = await fetchMarketEstimateWithWebSearch(
+              geminiResult.name,
+              geminiResult.search_keywords || []
+            );
+            if (webResult && (webResult.market_value_min > 0 || webResult.market_value_max > 0 || (webResult.ebay_links?.length > 0))) {
+              market_value_min = webResult.market_value_min ?? 0;
+              market_value_max = webResult.market_value_max ?? 0;
+              avg_growth_percentage = webResult.avg_growth_percentage ?? 0.05;
+              ebayLinks = Array.isArray(webResult.ebay_links) ? webResult.ebay_links : [];
+              ebayItems = Array.isArray(webResult.ebay_items) ? webResult.ebay_items : [];
+            }
+          } catch (e) {
+            if (__DEV__) console.warn('[Scanner] Web search fallback failed:', e?.message);
+          }
+        }
         if (cancelled) return;
         setCompletedSteps(2);
         await new Promise((r) => setTimeout(r, 500));
@@ -398,25 +427,25 @@ export default function ScannerScreen({ navigation }) {
         if (
           isSupabaseConfigured() &&
           supabase &&
-          userId &&
           isLocalFileUri(scanImageUri)
         ) {
           scanImageUrl = await ensurePublicImageUrl(
             scanImageUri,
             scanBase64,
-            userId,
+            userId ?? 'anonymous',
           );
         }
-        if (isLocalFileUri(scanImageUrl)) scanImageUrl = null;
+        // Login qilmagan: file URI saqlanadi (collection, antique, history da ko‘rinadi). Login qilgan: faqat Storage URL yoki null (file DB ga yozilmasin)
+        if (userId && isLocalFileUri(scanImageUrl)) scanImageUrl = null;
 
-        // Faqat Supabase Storage URL; file:// hech qachon antiques/snap_history ga yozilmasin
         const snapDisplayImageUrl = scanImageUrl;
+        const displayImageUrl = scanImageUrl || scanImageUri || null;
 
         const antiqueRow = {
           user_id: userId,
           name: geminiResult.name || "Unknown Antique",
           description: geminiResult.description || "",
-          image_url: scanImageUrl || null,
+          image_url: userId ? (scanImageUrl || null) : displayImageUrl,
           origin_country: geminiResult.origin_country || "Unknown",
           period_start_year: Number(geminiResult.period_start_year) || 1800,
           period_end_year: Number(geminiResult.period_end_year) || 1900,
@@ -481,6 +510,7 @@ export default function ScannerScreen({ navigation }) {
             ...geminiResult,
             market_value_min,
             market_value_max,
+            market_value_median,
             avg_growth_percentage,
             ...(geminiResult.estimated_market_value_usd != null
               ? { estimated_market_value_usd: Number(geminiResult.estimated_market_value_usd) }
@@ -490,7 +520,7 @@ export default function ScannerScreen({ navigation }) {
           const localId = useLocalCollectionStore.getState().addLocalScan(
             { ...antiqueRow, user_id: null },
             payload,
-            scanImageUri || null,
+            scanImageUrl || scanImageUri || null,
             scanBase64 || null
           );
           if (!isPro) {
@@ -507,7 +537,7 @@ export default function ScannerScreen({ navigation }) {
               {
                 name: "ItemDetails",
                 params: {
-                  antique: { ...antiqueRow, id: localId, user_id: null },
+                  antique: { ...antiqueRow, id: localId, user_id: null, market_value_median },
                   fromScan: true,
                 },
               },
@@ -528,6 +558,7 @@ export default function ScannerScreen({ navigation }) {
           ...geminiResult,
           market_value_min,
           market_value_max,
+          market_value_median,
           avg_growth_percentage,
           ...(geminiResult.estimated_market_value_usd != null
             ? { estimated_market_value_usd: Number(geminiResult.estimated_market_value_usd) }
@@ -738,6 +769,10 @@ export default function ScannerScreen({ navigation }) {
         <Pressable
           style={styles.galleryButton}
           onPress={async () => {
+            if (!isPro && remainingScans === 0) {
+              navigation.navigate("Pro", { fromScanner: true });
+              return;
+            }
             try {
               const { status } =
                 await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -769,6 +804,10 @@ export default function ScannerScreen({ navigation }) {
         <Pressable
           style={styles.captureButton}
           onPress={async () => {
+            if (!isPro && remainingScans === 0) {
+              navigation.navigate("Pro", { fromScanner: true });
+              return;
+            }
             triggerHaptic(vibration);
             if (!cameraRef.current) return;
             try {

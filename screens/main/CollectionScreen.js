@@ -30,13 +30,16 @@ import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
 import { useLocalCollectionStore, SAVED_COLLECTION_NAME, LOCAL_SAVED_ID } from '../../stores/useLocalCollectionStore';
 import { syncLocalCollectionToSupabase } from '../../lib/syncLocalCollection';
-import { formatPriceUsd } from '../../lib/currency';
+import { formatPriceUsd, getDisplayMarketValueUsd } from '../../lib/currency';
 
 const THUMB_GAP = 7;
 const THUMB_COUNT = 2;
 
 function isImageUrl(s) {
   return typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://'));
+}
+function isImageUri(s) {
+  return typeof s === 'string' && (s.startsWith('http') || s.startsWith('file://') || s.startsWith('content://'));
 }
 
 function CollectionCard({ title, count, thumbnails, onPress, styles }) {
@@ -61,7 +64,7 @@ function CollectionCard({ title, count, thumbnails, onPress, styles }) {
               ]}
             >
               {src ? (
-                isImageUrl(src) ? (
+                isImageUri(src) ? (
                   <Image source={{ uri: src }} style={SS.absoluteFill} resizeMode="cover" />
                 ) : (
                   <View style={[SS.absoluteFill, { backgroundColor: src }]} />
@@ -160,7 +163,8 @@ export default function CollectionScreen({ navigation, route }) {
         thumb: { borderRadius: 16, backgroundColor: colors.border3, overflow: 'hidden' },
         thumbEmpty: { backgroundColor: colors.border1 },
         loadingWrap: { paddingVertical: 48, alignItems: 'center' },
-        emptyHistory: { paddingVertical: 48, alignItems: 'center' },
+        emptyHistory: { paddingVertical: 48, alignItems: 'center', justifyContent: 'center' },
+        emptyHistoryImage: { width: 160, height: 64, marginBottom: 24, marginTop: 140 },
         emptyHistoryText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textSecondary, textAlign: 'center' },
         emptyHistorySubtext: { textAlign: 'center', fontFamily: fonts.regular, fontSize: 14, color: colors.textTertiary, marginTop: 4, marginHorizontal: 16 },
         historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgWhite, borderRadius: 20, padding: 12, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
@@ -652,7 +656,14 @@ export default function CollectionScreen({ navigation, route }) {
                       if (coll.id === LOCAL_SAVED_ID) {
                         const history = useLocalCollectionStore.getState().getLocalSnapHistory?.() ?? useLocalCollectionStore.getState().localSnapHistory ?? [];
                         const byId = {};
-                        history.forEach((s) => { if (s.antique) byId[s.antique_id] = s.antique; });
+                        history.forEach((s) => {
+                          if (s.antique) {
+                            byId[s.antique_id] = {
+                              ...s.antique,
+                              image_url: s.antique?.image_url ?? s.image_url ?? null,
+                            };
+                          }
+                        });
                         localItems = [...ids].reverse().map((id) => byId[id]).filter(Boolean);
                       }
                       mainStack?.navigate('CollectionDetail', {
@@ -678,7 +689,12 @@ export default function CollectionScreen({ navigation, route }) {
                 },
               ]}
             >
-              <Text style={styles.emptyHistoryText}>No collections yet</Text>
+              <Image
+                source={require('../../assets/emptypages/collection.png')}
+                style={styles.emptyHistoryImage}
+                resizeMode="contain"
+              />
+              <Text style={styles.emptyHistoryText}>Collection is empty</Text>
               <Text style={styles.emptyHistorySubtext}>Tap + to create a space</Text>
             </Animated.View>
           )
@@ -698,11 +714,13 @@ export default function CollectionScreen({ navigation, route }) {
                   },
                 ]}
               >
+                <Image
+                  source={require('../../assets/emptypages/snap.png')}
+                  style={styles.emptyHistoryImage}
+                  resizeMode="contain"
+                />
                 <Text style={styles.emptyHistoryText}>
-                  {fetchError ? 'Ma\'lumotlar yuklanmadi' : 'No scan history yet'}
-                </Text>
-                <Text style={styles.emptyHistorySubtext}>
-                  {fetchError ? fetchError + ' — tortib yangilang yoki qayta kiring.' : 'Your snaps will appear here'}
+                  {fetchError ? 'Ma\'lumotlar yuklanmadi' : 'Snap history is empty'}
                 </Text>
               </Animated.View>
             ) : (
@@ -710,11 +728,16 @@ export default function CollectionScreen({ navigation, route }) {
                 const category = Array.isArray(snap.payload?.category)
                   ? snap.payload.category.join(', ')
                   : (snap.payload?.category || 'Antique');
-                const min = snap.payload?.market_value_min;
-                const max = snap.payload?.market_value_max;
-                const est = snap.payload?.estimated_market_value_usd;
-                const currentValue = (min != null && Number(min) > 0) ? Number(min) : (max != null && Number(max) > 0) ? Number(max) : (est != null ? Number(est) : null);
-                const priceStr = currentValue != null && currentValue > 0 ? formatPriceUsd(currentValue, displayCurrency, rate) : '';
+                const displayValueObj = {
+                  market_value_min: snap.payload?.market_value_min,
+                  market_value_max: snap.payload?.market_value_max,
+                  specification: {
+                    estimated_market_value_usd: snap.payload?.estimated_market_value_usd,
+                    ebay_items: snap.antique?.specification?.ebay_items,
+                  },
+                };
+                const currentValue = getDisplayMarketValueUsd(displayValueObj);
+                const priceStr = currentValue > 0 ? formatPriceUsd(currentValue, displayCurrency, rate) : '';
                 const animIdx = Math.min(idx, HISTORY_CARD_ANIM_COUNT - 1);
                 const anim = historyCardAnims[animIdx];
                 return (
@@ -727,7 +750,13 @@ export default function CollectionScreen({ navigation, route }) {
                       onPress={() => {
                         if (snap.antique) {
                           returnedFromChildRef.current = true;
-                          mainStack?.navigate('ItemDetails', { antique: snap.antique, fromHistory: true });
+                          mainStack?.navigate('ItemDetails', {
+                            antique: {
+                              ...snap.antique,
+                              image_url: snap.antique?.image_url ?? snap.image_url ?? null,
+                            },
+                            fromHistory: true,
+                          });
                         } else if (snap.antique_id) {
                           returnedFromChildRef.current = true;
                           mainStack?.navigate('ItemDetails', { antiqueId: snap.antique_id, fromHistory: true });

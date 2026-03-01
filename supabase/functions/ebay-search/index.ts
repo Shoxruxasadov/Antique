@@ -1,9 +1,9 @@
 // Supabase Edge Function: eBay Browse API orqali qidiruv (narx, rasm, link).
-// Kalitlar faqat get-api-keys dan (SUPABASE_URL avtomatik). Hech qanday secret kerak emas.
-// Ixtiyoriy: EBAY_SANDBOX=true
+// Kalitlar: Deno.env dan EBAY_APP_ID va EBAY_CERT_ID (Supabase Edge Function Secrets).
+// Production: EBAY_SANDBOX ni o‘rnatmaslang yoki EBAY_SANDBOX=false. Sandbox: EBAY_SANDBOX=true
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const SANDBOX = Deno.env.get("EBAY_SANDBOX") !== "false";
+const SANDBOX = Deno.env.get("EBAY_SANDBOX") === "true";
 const BASE = SANDBOX
   ? "https://api.sandbox.ebay.com"
   : "https://api.ebay.com";
@@ -11,14 +11,6 @@ const BASE = SANDBOX
 interface TokenResponse {
   access_token: string;
   expires_in?: number;
-}
-
-interface ApiKeysResponse {
-  geminiApiKey?: string;
-  ebayAppId?: string;
-  ebayCertId?: string;
-  ebayDevId?: string;
-  success?: boolean;
 }
 
 interface ItemSummary {
@@ -35,26 +27,12 @@ interface SearchResponse {
   total?: number;
 }
 
-async function getEbayCredentials(): Promise<{ appId: string; certId: string }> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  if (!supabaseUrl) throw new Error("SUPABASE_URL not set");
-  const headers: Record<string, string> = {};
-  if (anonKey) headers["Authorization"] = `Bearer ${anonKey}`;
-  const r = await fetch(`${supabaseUrl}/functions/v1/get-api-keys`, { headers });
-  if (!r.ok) {
-    const body = await r.text();
-    throw new Error(`get-api-keys failed: ${r.status} ${body}`);
-  }
-  const data = (await r.json()) as ApiKeysResponse;
-  if (!data?.success || !data?.ebayAppId || !data?.ebayCertId) {
-    throw new Error("get-api-keys did not return ebayAppId/ebayCertId");
-  }
-  return { appId: data.ebayAppId, certId: data.ebayCertId };
-}
-
 async function getEbayToken(): Promise<string> {
-  const { appId, certId } = await getEbayCredentials();
+  const appId = Deno.env.get("EBAY_APP_ID")?.trim();
+  const certId = Deno.env.get("EBAY_CERT_ID")?.trim();
+  if (!appId || !certId) {
+    throw new Error("EBAY_APP_ID and EBAY_CERT_ID must be set in Edge Function secrets");
+  }
   const credentials = btoa(`${appId}:${certId}`);
   const scope = "https://api.ebay.com/oauth/api_scope";
   const res = await fetch(`${BASE}/identity/v1/oauth2/token`, {
@@ -106,7 +84,7 @@ Deno.serve(async (req: Request) => {
     const query = q ?? (Array.isArray(keywords) ? keywords.join(" ") : String(keywords ?? ""));
     if (!query.trim()) {
       return json(
-        { market_value_min: 0, market_value_max: 0, image_urls: [], ebay_links: [] },
+        { market_value_min: 0, market_value_max: 0, market_value_median: 0, image_urls: [], ebay_links: [] },
         400
       );
     }
@@ -128,6 +106,14 @@ Deno.serve(async (req: Request) => {
     }
     const market_value_min = prices.length ? Math.min(...prices) : 0;
     const market_value_max = prices.length ? Math.max(...prices) : 0;
+    const sorted = [...prices].sort((a, b) => a - b);
+    const mid = sorted.length >> 1;
+    const market_value_median =
+      sorted.length > 0
+        ? sorted.length % 2 === 1
+          ? sorted[mid]
+          : (sorted[mid - 1] + sorted[mid]) / 2
+        : 0;
     const ebay_items = items
       .filter((it) => it.itemWebUrl)
       .map((it) => ({
@@ -140,6 +126,7 @@ Deno.serve(async (req: Request) => {
     return json({
       market_value_min,
       market_value_max,
+      market_value_median,
       avg_growth_percentage: 0.05,
       image_urls,
       ebay_links,
