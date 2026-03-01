@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "AntiqPro",
-    "slug": "AntiqPro",
+    "slug": "Antique",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "com.webnum.antique",
@@ -16,7 +16,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.webnum.antique",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "buildNumber": "11",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "icon": "./assets/logo.png",
@@ -43,7 +47,8 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
-      "package": "com.webnum.antique"
+      "package": "com.webnum.antique",
+      "versionCode": 11
     },
     "web": {
       "favicon": "./assets/logo.png"
@@ -76,6 +81,12 @@
       "eas": {
         "projectId": "e8f67aa9-ebfb-4dcc-8062-b8a8ee631705"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e8f67aa9-ebfb-4dcc-8062-b8a8ee631705"
     }
   }
 }
