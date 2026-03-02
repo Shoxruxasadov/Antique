@@ -17,7 +17,7 @@
     },
     "expo": {
       "distribution": "internal",
-      "ios": { "simulator": true },
+      "ios": { "simulator": false },
       "android": { "buildType": "apk" },
       "channel": "expo"
     },
