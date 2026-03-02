@@ -10,6 +10,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { mapSupabaseUserToStore } from '../../lib/authSync';
 import { signInWithOAuthProvider } from '../../lib/oauthSupabase';
 import { openTermsOfUse, openPrivacyPolicy } from '../../lib/legalLinks';
+import { t } from '../../lib/i18n';
 
 const ICON_SIZE = 22;
 
@@ -31,7 +32,7 @@ export default function GetStartedScreen({ navigation }) {
       const result = await signInWithOAuthProvider(provider);
       if (result.error) {
         if (result.error !== 'Cancelled') {
-          Alert.alert('Sign in', result.error);
+          Alert.alert(t('auth.alertSignIn'), result.error);
         }
         return;
       }
@@ -76,15 +77,15 @@ export default function GetStartedScreen({ navigation }) {
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       <Pressable style={styles.skipBtn} onPress={handleSkip}>
-        <Text style={styles.skipText}>Skip</Text>
+        <Text style={styles.skipText}>{t('auth.skip')}</Text>
         <CaretRight size={18} color={colors.textBrand} weight="bold" />
       </Pressable>
 
       <View style={styles.content}>
         <Image source={require('../../assets/radial_logo.png')} style={styles.icon} resizeMode="contain" />
-        <Text style={styles.title}>Sign Up</Text>
+        <Text style={styles.title}>{t('auth.signUp')}</Text>
         <Text style={styles.subtitle}>
-          To continue using our app, please login to your account
+          {t('auth.getStartedDescription')}
         </Text>
 
         <Pressable
@@ -98,7 +99,7 @@ export default function GetStartedScreen({ navigation }) {
             <Ionicons name="logo-apple" size={ICON_SIZE} color={colors.textInverse} />
           )}
           <Text style={styles.btnAppleText}>
-            {oauthLoading === 'apple' ? 'Signing in…' : 'Continue with Apple'}
+            {oauthLoading === 'apple' ? t('auth.signingIn') : t('auth.continueWithApple')}
           </Text>
         </Pressable>
 
@@ -107,7 +108,7 @@ export default function GetStartedScreen({ navigation }) {
           onPress={() => navigation.navigate('SignUp')}
         >
           <Ionicons name="mail" size={ICON_SIZE} color={colors.textBase} />
-          <Text style={styles.btnEmailText}>Continue with Email</Text>
+          <Text style={styles.btnEmailText}>{t('auth.continueWithEmail')}</Text>
         </Pressable>
 
         <Pressable
@@ -121,26 +122,26 @@ export default function GetStartedScreen({ navigation }) {
             <Image source={require('../../assets/google.webp')} style={{ width: 19, height: 19, margin: 1.5, marginRight: 0 }} resizeMode="contain" />
           )}
           <Text style={styles.btnGoogleText}>
-            {oauthLoading === 'google' ? 'Signing in…' : 'Continue with Google'}
+            {oauthLoading === 'google' ? t('auth.signingIn') : t('auth.continueWithGoogle')}
           </Text>
         </Pressable>
 
         <View style={styles.footerRow}>
-          <Text style={styles.footerLabel}>Already have an account? </Text>
+          <Text style={styles.footerLabel}>{t('auth.alreadyHaveAccount')}</Text>
           <Pressable onPress={() => navigation.navigate('SignIn')}>
-            <Text style={styles.footerLink}>Log In</Text>
+            <Text style={styles.footerLink}>{t('auth.logIn')}</Text>
           </Pressable>
         </View>
       </View>
 
       <View style={[styles.legalFooter, { paddingBottom: insets.bottom + 16 }]}>
-        <Text style={styles.legalFooterText}>By continuing, you agree to our </Text>
+        <Text style={styles.legalFooterText}>{t('auth.agreeTerms')}</Text>
         <Pressable onPress={openTermsOfUse}>
-          <Text style={styles.legalFooterLink}>Terms of Use</Text>
+          <Text style={styles.legalFooterLink}>{t('auth.termsOfUse')}</Text>
         </Pressable>
         <Text style={styles.legalFooterText}> and </Text>
         <Pressable onPress={openPrivacyPolicy}>
-          <Text style={styles.legalFooterLink}>Privacy Policy</Text>
+          <Text style={styles.legalFooterLink}>{t('auth.privacyPolicy')}</Text>
         </Pressable>
         <Text style={styles.legalFooterText}>.</Text>
       </View>

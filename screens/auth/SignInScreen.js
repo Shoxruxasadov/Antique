@@ -22,6 +22,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { mapSupabaseUserToStore } from '../../lib/authSync';
 import { signInWithOAuthProvider } from '../../lib/oauthSupabase';
 import { openTermsOfUse, openPrivacyPolicy } from '../../lib/legalLinks';
+import { t } from '../../lib/i18n';
 
 const ICON_SIZE = 22;
 
@@ -125,14 +126,14 @@ export default function SignInScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Sign In</Text>
+          <Text style={styles.title}>{t('auth.signIn.title')}</Text>
           <Text style={styles.subtitle}>
-            To continue using our app create account first.
+            {t('auth.signIn.description')}
           </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Enter your email"
+            placeholder={t('auth.signIn.emailPlaceholder')}
             placeholderTextColor={colors.textTertiary}
             value={email}
             onChangeText={setEmail}
@@ -142,7 +143,7 @@ export default function SignInScreen({ navigation }) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder={t('auth.signIn.passwordPlaceholder')}
             placeholderTextColor={colors.textTertiary}
             value={password}
             onChangeText={setPassword}
@@ -153,7 +154,7 @@ export default function SignInScreen({ navigation }) {
             style={styles.forgotLink}
             onPress={() => navigation.navigate('ForgotPassword')}
           >
-            <Text style={styles.forgotText}>Forgot password?</Text>
+            <Text style={styles.forgotText}>{t('auth.signIn.forgotPassword')}</Text>
           </Pressable>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -166,13 +167,13 @@ export default function SignInScreen({ navigation }) {
             {loading ? (
               <ActivityIndicator color={colors.textWhite} />
             ) : (
-              <Text style={styles.primaryBtnText}>Sign In</Text>
+              <Text style={styles.primaryBtnText}>{t('auth.signIn.submit')}</Text>
             )}
           </Pressable>
 
           <View style={styles.orRow}>
             <View style={styles.orLine} />
-            <Text style={styles.orText}>or</Text>
+            <Text style={styles.orText}>{t('auth.signIn.or')}</Text>
             <View style={styles.orLine} />
           </View>
 
@@ -187,7 +188,7 @@ export default function SignInScreen({ navigation }) {
               <Ionicons name="logo-apple" size={22} color={colors.textInverse} />
             )}
             <Text style={styles.btnAppleText}>
-              {oauthLoading === 'apple' ? 'Signing in…' : 'Continue with Apple'}
+              {oauthLoading === 'apple' ? t('auth.signingIn') : t('auth.continueWithApple')}
             </Text>
           </Pressable>
 
@@ -202,7 +203,7 @@ export default function SignInScreen({ navigation }) {
               <Image source={require('../../assets/google.webp')} style={{ width: 19, height: 19, margin: 1.5, marginRight: 0 }} resizeMode="contain" />
             )}
             <Text style={styles.btnGoogleText}>
-              {oauthLoading === 'google' ? 'Signing in…' : 'Continue with Google'}
+              {oauthLoading === 'google' ? t('auth.signingIn') : t('auth.continueWithGoogle')}
             </Text>
           </Pressable>
         </ScrollView>

@@ -7,7 +7,7 @@
     "start": "npx expo start --clear",
     "dev": "npx expo start",
     "dev:ios": "concurrently -n metro,ios \"EXPO_OFFLINE=1 npx expo start --clear\" \"wait-on tcp:127.0.0.1:8081 -t 60000 && sleep 8 && CI=false npx expo run:ios\"",
-    "ios:sim": "CI=false npx expo run:ios --device 'iPhone 15'",
+    "ios:sim": "CI=false npx expo run:ios --device 'iPhone 16e'",
     "android": "npx expo run:android",
     "ios": "npx expo run:ios",
     "web": "npx expo start --web",
@@ -23,6 +23,10 @@
     "deploy:testflight": "npm run increment-build && npx eas build --platform ios --profile production --auto-submit",
     "dev:go": "npx expo start --clear --ios",
     "dev:ios:metro": "concurrently -n metro,ios \"EXPO_OFFLINE=1 npx expo start --clear\" \"wait-on tcp:127.0.0.1:8081 -t 60000 && CI=false npx expo run:ios\"",
+    "clean:cache": "rm -rf .expo node_modules/.cache",
+    "prebuild:clean": "npx expo prebuild --clean",
+    "clean:ios": "npm run clean:cache && npx expo prebuild --clean",
+    "ios:fresh": "npm run clean:cache && npx expo prebuild --clean && npx expo run:ios --no-build-cache",
     "supabase:deploy-ebay": "npx supabase functions deploy ebay-search"
   },
   "dependencies": {

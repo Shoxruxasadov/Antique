@@ -20,6 +20,7 @@ import Svg, {
   Rect,
 } from "react-native-svg";
 import { darkTheme, fonts } from "../../theme";
+import { t } from "../../lib/i18n";
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get("window");
 
@@ -34,28 +35,14 @@ const SCREEN_WIDTH = PHONE_WIDTH - SCREEN_INSET_X * 2;
 const SCREEN_HEIGHT = PHONE_HEIGHT - SCREEN_INSET_Y * 2;
 
 // Variant B: full onboarding images; crop to screen via position (center ~85% of image = phone screen)
+const SLIDE_IDS = ["1", "2", "3"];
+const SLIDE_IMAGE_1 = require("../../assets/onboarding/Onboarding-clear1.png");
+const SLIDE_IMAGE_2 = require("../../assets/onboarding/Onboarding-clear2.png");
+const SLIDE_IMAGE_3 = require("../../assets/onboarding/Onboarding-clear3.png");
 const SLIDES = [
-  {
-    id: "1",
-    screenImage: require("../../assets/onboarding/Onboarding-clear1.png"),
-    title: "Discover the Story\nBehind Every Antique",
-    description:
-      "Scan objects instantly and uncover their age, origin, and hidden history.",
-  },
-  {
-    id: "2",
-    screenImage: require("../../assets/onboarding/Onboarding-clear2.png"),
-    title: "Identify & Value Your Treasures",
-    description:
-      "Get accurate item IDs and real-time market value estimates in seconds.",
-  },
-  {
-    id: "3",
-    screenImage: require("../../assets/onboarding/Onboarding-clear3.png"),
-    title: "Expert-Level Insights, Powered by AI",
-    description:
-      "Analyze details like a professional appraiser — effortlessly and anywhere.",
-  },
+  { id: SLIDE_IDS[0], screenImage: SLIDE_IMAGE_1, titleKey: "onboarding.slide1Title", descKey: "onboarding.slide1Desc" },
+  { id: SLIDE_IDS[1], screenImage: SLIDE_IMAGE_2, titleKey: "onboarding.slide2Title", descKey: "onboarding.slide2Desc" },
+  { id: SLIDE_IDS[2], screenImage: SLIDE_IMAGE_3, titleKey: "onboarding.slide3Title", descKey: "onboarding.slide3Desc" },
 ];
 
 const DOT_SIZE = 8;
@@ -148,8 +135,8 @@ function SlideContent({ item }) {
       />
 
       <View style={styles.slideContent}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description}>{item.description}</Text>
+        <Text style={styles.title}>{t(item.titleKey)}</Text>
+        <Text style={styles.description}>{t(item.descKey)}</Text>
       </View>
     </View>
   );
@@ -325,7 +312,7 @@ export default function OnboardingScreen({ navigation, onComplete }) {
         </View>
         <Pressable style={styles.continueButton} onPress={handleNext}>
           <Text style={styles.continueButtonText}>
-            {currentIndex === SLIDES.length - 1 ? "Get Started" : "Continue"}
+            {currentIndex === SLIDES.length - 1 ? t("onboarding.getStarted") : t("onboarding.continue")}
           </Text>
         </Pressable>
       </View>

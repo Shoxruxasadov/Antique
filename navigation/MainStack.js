@@ -3,6 +3,7 @@ import MainTabs from './MainTabs';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import AppSettingsScreen from '../screens/settings/AppSettingsScreen';
 import PreferredCurrencyScreen from '../screens/settings/PreferredCurrencyScreen';
+import LanguageScreen from '../screens/settings/LanguageScreen';
 import ScannerScreen from '../screens/stack/ScannerScreen';
 import InfoScannerScreen from '../screens/stack/InfoScannerScreen';
 import AntiqueScreen from '../screens/stack/AntiqueScreen';
@@ -25,6 +26,7 @@ export default function MainStack() {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="AppSettings" component={AppSettingsScreen} />
       <Stack.Screen name="PreferredCurrency" component={PreferredCurrencyScreen} />
+      <Stack.Screen name="Language" component={LanguageScreen} />
       <Stack.Screen name="Identify" component={ScannerScreen} />
       <Stack.Screen name="InfoScanner" component={InfoScannerScreen} />
       <Stack.Screen name="ItemDetails" component={AntiqueScreen} />

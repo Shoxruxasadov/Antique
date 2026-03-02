@@ -17,6 +17,7 @@ import { useColors, fonts } from '../../theme';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { openTermsOfUse, openPrivacyPolicy } from '../../lib/legalLinks';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { t } from '../../lib/i18n';
 import { mapSupabaseUserToStore } from '../../lib/authSync';
 
 export default function SignUpScreen({ navigation }) {
@@ -112,14 +113,14 @@ export default function SignUpScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Sign Up</Text>
+          <Text style={styles.title}>{t('auth.signUp.title')}</Text>
           <Text style={styles.subtitle}>
-            To continue using our app create account first
+            {t('auth.signUp.description')}
           </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Enter your name"
+            placeholder={t('auth.signUp.namePlaceholder')}
             placeholderTextColor={colors.textTertiary}
             value={name}
             onChangeText={setName}
@@ -127,7 +128,7 @@ export default function SignUpScreen({ navigation }) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Enter your email"
+            placeholder={t('auth.signUp.emailPlaceholder')}
             placeholderTextColor={colors.textTertiary}
             value={email}
             onChangeText={setEmail}
@@ -137,7 +138,7 @@ export default function SignUpScreen({ navigation }) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder={t('auth.signUp.passwordPlaceholder')}
             placeholderTextColor={colors.textTertiary}
             value={password}
             onChangeText={setPassword}
@@ -145,7 +146,7 @@ export default function SignUpScreen({ navigation }) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Repeat password"
+            placeholder={t('auth.signUp.repeatPassword')}
             placeholderTextColor={colors.textTertiary}
             value={repeatPassword}
             onChangeText={setRepeatPassword}
@@ -162,18 +163,18 @@ export default function SignUpScreen({ navigation }) {
             {loading ? (
               <ActivityIndicator color={colors.textWhite} />
             ) : (
-              <Text style={styles.primaryBtnText}>Sign Up</Text>
+              <Text style={styles.primaryBtnText}>{t('auth.signUp.submit')}</Text>
             )}
           </Pressable>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>By continuing, you agree to our </Text>
+            <Text style={styles.footerText}>{t('auth.signUp.agreeTerms')}</Text>
             <Pressable onPress={openTermsOfUse}>
-              <Text style={styles.footerLink}>Terms of Use</Text>
+              <Text style={styles.footerLink}>{t('auth.termsOfUse')}</Text>
             </Pressable>
-            <Text style={styles.footerText}> and </Text>
+            <Text style={styles.footerText}>{t('auth.and')}</Text>
             <Pressable onPress={openPrivacyPolicy}>
-              <Text style={styles.footerLink}>Privacy Policy</Text>
+              <Text style={styles.footerLink}>{t('auth.privacyPolicy')}</Text>
             </Pressable>
             <Text style={styles.footerText}>.</Text>
           </View>

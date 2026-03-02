@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft } from 'phosphor-react-native';
 import { useColors, fonts } from '../../theme';
+import { t } from '../../lib/i18n';
 import { fetchBlogCategories, fetchBlogs } from '../../lib/blogApi';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -189,7 +190,7 @@ export default function AllPostsScreen({ navigation }) {
         >
           <CaretLeft size={24} color={colors.textBase} weight="bold" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Blog</Text>
+        <Text style={styles.headerTitle}>{t('blog.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -231,7 +232,7 @@ export default function AllPostsScreen({ navigation }) {
           </View>
         ) : postsForTab.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyCardText}>No posts yet</Text>
+            <Text style={styles.emptyCardText}>{t('blog.noPosts')}</Text>
           </View>
         ) : (
           postsForTab.map((post) => (

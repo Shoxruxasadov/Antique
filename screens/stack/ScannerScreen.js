@@ -41,7 +41,7 @@ import { analyzeAntiqueImage } from "../../lib/gemini";
 import { fetchMarketPricesFromEbay } from "../../lib/ebay";
 import { fetchMarketEstimateWithWebSearch } from "../../lib/gemini";
 import { uploadSnapImage } from "../../lib/snapStorage";
-import { t } from "../../lib/i18n";
+import { t, getLocale } from "../../lib/i18n";
 import { checkIsPro } from "../../lib/revenueCat";
 
 const CAMERA_BORDER_RADIUS = 24;
@@ -55,11 +55,7 @@ function getTodayStr() {
 const SCAN_CORNER_SIZE = 40;
 const SCAN_BORDER_WIDTH = 4;
 
-const CHECKLIST_STEPS = [
-  "Analyzing image",
-  "Fetching market value",
-  "Saving result",
-];
+const CHECKLIST_STEPS = ["scanner.step1", "scanner.step2", "scanner.step3"];
 
 function isLocalFileUri(uri) {
   return (
@@ -369,13 +365,14 @@ export default function ScannerScreen({ navigation }) {
         const geminiResult = await analyzeAntiqueImage(
           scanBase64 || "",
           "image/jpeg",
+          getLocale(),
         );
         if (cancelled) return;
         if (geminiResult.is_antique === false) {
           setNotAntique(true);
           setNotAntiqueReason(
             geminiResult.not_antique_reason ||
-              "This does not appear to be an antique.",
+              t("scanner.notAntiqueFallback"),
           );
           return;
         }
@@ -853,17 +850,17 @@ export default function ScannerScreen({ navigation }) {
                   size={48}
                   color={colors.textSecondary}
                 />
-                <Text style={styles.notAntiqueTitle}>Bu antikvar emas</Text>
+                <Text style={styles.notAntiqueTitle}>{t('scanner.notAntique')}</Text>
                 <Text style={styles.notAntiqueReason}>{notAntiqueReason}</Text>
                 <Text style={styles.backHint} onPress={goBackToScanner}>
-                  Orqaga
+                  {t('scanner.back')}
                 </Text>
               </View>
             ) : scanError ? (
               <View style={styles.errorCard}>
                 <Text style={styles.errorText}>{scanError}</Text>
                 <Text style={styles.backHint} onPress={goBackToScanner}>
-                  Orqaga
+                  {t('scanner.back')}
                 </Text>
               </View>
             ) : (
@@ -876,7 +873,7 @@ export default function ScannerScreen({ navigation }) {
                   />
                 </View>
                 <Text style={styles.scanningText}>
-                  Scanning{'.'.repeat(scanningDots)}
+                  {t('scanner.scanning')}{'.'.repeat(scanningDots)}
                 </Text>
                 <View style={styles.scanStepsWrap}>
                   {CHECKLIST_STEPS.filter((_, index) => (index === 0 ? completedSteps >= 1 : index <= completedSteps)).map((label, index) => {
@@ -911,7 +908,7 @@ export default function ScannerScreen({ navigation }) {
                             </Animated.View>
                           ) : null}
                         </View>
-                        <Text style={styles.stepText}>{label}</Text>
+                        <Text style={styles.stepText}>{t(label)}</Text>
                       </Animated.View>
                     );
                   })}

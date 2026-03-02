@@ -17,6 +17,7 @@ import { openTermsOfUse, openPrivacyPolicy } from '../../lib/legalLinks';
 import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
 import { fonts } from '../../theme';
 import { getPackageToPurchase, purchasePackage, restorePurchases } from '../../lib/revenueCat';
+import { t } from '../../lib/i18n';
 
 const COUNTDOWN_MS = 3000;
 const PROGRESS_SIZE = 32;
@@ -42,12 +43,7 @@ const PRO_DARK = {
   green: '#44D84B',
 };
 
-const FEATURES = [
-  'Unlimited antique scans every day',
-  'Detailed Valuations Report and insights',
-  'Provenance & History Breakdown',
-  'Ad-Free Experience',
-];
+const FEATURE_KEYS = ['pro.feature1', 'pro.feature2', 'pro.feature3', 'pro.feature4'];
 
 export default function ProScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -142,13 +138,13 @@ export default function ProScreen({ navigation }) {
       </View>
 
       <View style={[styles.scrollContent, { transform: [{ translateY: -10 }] }]}>
-        <Text style={styles.headline}>Unlock Premium</Text>
-        <Text style={styles.description}>Collect cards and enjoy exclusive features and benefits</Text>
+        <Text style={styles.headline}>{t('pro.unlockPremium')}</Text>
+        <Text style={styles.description}>{t('pro.description')}</Text>
 
-        {FEATURES.map((item, i) => (
+        {FEATURE_KEYS.map((key, i) => (
           <View key={i} style={styles.featureRow}>
             <Check size={24} color={PRO_DARK.text} />
-            <Text style={styles.featureText}>{item}</Text>
+            <Text style={styles.featureText}>{t(key)}</Text>
           </View>
         ))}
 
@@ -162,8 +158,8 @@ export default function ProScreen({ navigation }) {
                 <Check size={14} color={PRO_DARK.bg} weight="bold" />
               ) : null}
             </View>
-            <Text style={styles.planTitle}>Weekly</Text>
-            <Text style={styles.planSub}>USD$4.99/week</Text>
+            <Text style={styles.planTitle}>{t('pro.weekly')}</Text>
+            <Text style={styles.planSub}>{t('pro.weeklyPrice')}</Text>
           </Pressable>
 
           <Pressable
@@ -175,12 +171,12 @@ export default function ProScreen({ navigation }) {
                 <Check size={14} color={PRO_DARK.bg} weight="bold" />
               ) : null}
             </View>
-            <Text style={styles.planTitle}>Annual</Text>
-            <Text style={styles.planSub}>USD$29.99/year</Text>
+            <Text style={styles.planTitle}>{t('pro.annual')}</Text>
+            <Text style={styles.planSub}>{t('pro.annualPrice')}</Text>
           </Pressable>
         </View>
 
-        <Text style={styles.pricingNote}>{plan === 'annual' ? 'USD$29.99/year, cancel anytime' : '3 days free trial, then just USD$4.99/week'}</Text>
+        <Text style={styles.pricingNote}>{plan === 'annual' ? t('pro.annualNote') : t('pro.trialNote')}</Text>
 
         <Pressable
           style={[styles.ctaBtn, purchasing && styles.ctaBtnDisabled]}
@@ -190,46 +186,46 @@ export default function ProScreen({ navigation }) {
             try {
               const pkg = await getPackageToPurchase(plan);
               if (!pkg) {
-                Alert.alert('Error', 'No package available for purchase', [{ text: 'Ok' }]);
+                Alert.alert(t('common.error'), t('pro.noPackageAvailable'), [{ text: t('common.ok') }]);
                 return;
               }
               await purchasePackage(pkg);
               navigation.goBack();
             } catch (e) {
               if (e?.userCancelled ?? e?.code === 'PURCHASE_CANCELLED') return;
-              Alert.alert('Error', e?.message || 'Purchase failed');
+              Alert.alert(t('common.error'), e?.message || t('pro.purchaseFailed'), [{ text: t('common.ok') }]);
             } finally {
               setPurchasing(false);
             }
           }}
           disabled={purchasing}
-        ><Text style={styles.ctaBtnText}>CONTINUE</Text>
+        ><Text style={styles.ctaBtnText}>{t('pro.continue')}</Text>
         </Pressable>
 
         <View style={styles.footer}>
           <Pressable onPress={openTermsOfUse}>
-            <Text style={styles.footerLink}>Terms of Use</Text>
+            <Text style={styles.footerLink}>{t('pro.termsOfUse')}</Text>
           </Pressable>
           <Pressable
             onPress={async () => {
               const info = await restorePurchases();
               if (info == null) {
-                Alert.alert('Error', 'Could not restore purchases. Please try again.');
+                Alert.alert(t('common.error'), t('pro.restoreError'), [{ text: t('common.ok') }]);
                 return;
               }
               const hasActive = info.entitlements?.active && Object.keys(info.entitlements.active).length > 0;
               if (!hasActive) {
-                Alert.alert('No purchases to restore', 'No previous membership found for this account.');
+                Alert.alert(t('pro.noPurchasesTitle'), t('pro.noPreviousMembership'), [{ text: t('common.ok') }]);
                 return;
               }
-              Alert.alert('Success', 'Membership restored.');
+              Alert.alert(t('pro.successTitle'), t('pro.membershipRestored'), [{ text: t('common.ok') }]);
               navigation.goBack();
             }}
           >
-            <Text style={styles.footerLink}>Restore</Text>
+            <Text style={styles.footerLink}>{t('pro.restore')}</Text>
           </Pressable>
           <Pressable onPress={openPrivacyPolicy}>
-            <Text style={styles.footerLink}>Privacy Policy</Text>
+            <Text style={styles.footerLink}>{t('pro.privacyPolicy')}</Text>
           </Pressable>
         </View>
       </View>

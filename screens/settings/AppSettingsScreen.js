@@ -5,10 +5,11 @@ import {
   Text,
   TouchableOpacity,
   Switch,
-  Linking,
   SafeAreaView,
+  Platform,
+  Linking,
 } from 'react-native';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft, CaretRight } from 'phosphor-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, fonts } from '../../theme';
@@ -24,8 +25,12 @@ export default function AppSettingsScreen({ navigation }) {
   const setDarkMode = useAppSettingsStore((s) => s.setDarkMode);
   const [notifications, setNotifications] = useState(true);
 
-  const openAppSettings = () => {
-    Linking.openSettings();
+  const onLanguagePress = () => {
+    if (Platform.OS === 'ios') {
+      Linking.openSettings();
+    } else {
+      navigation?.navigate?.('Language');
+    }
   };
 
   const styles = useMemo(
@@ -59,6 +64,7 @@ export default function AppSettingsScreen({ navigation }) {
           borderRadius: 12,
           paddingHorizontal: 16,
           paddingVertical: 14,
+          height: 56,
         },
         label: {
           fontSize: 16,
@@ -71,7 +77,6 @@ export default function AppSettingsScreen({ navigation }) {
           fontFamily: fonts.regular,
           color: colors.textSecondary,
         },
-        chevron: { fontSize: 20, color: colors.textTertiary },
       }),
     [colors]
   );
@@ -93,7 +98,7 @@ export default function AppSettingsScreen({ navigation }) {
         </View>
 
         <View style={styles.content}>
-          <View style={styles.card}>
+          <View style={[styles.card, { borderTopEndRadius: 24, borderTopStartRadius: 24, marginTop: 8}]}>
             <Text style={styles.label}>{t('appSettings.vibration')}</Text>
             <Switch
               value={vibration}
@@ -113,11 +118,11 @@ export default function AppSettingsScreen({ navigation }) {
             />
           </View>
 
-          <TouchableOpacity style={styles.card} onPress={openAppSettings} activeOpacity={0.7}>
+          <TouchableOpacity style={[styles.card, { borderBottomEndRadius: 24, borderBottomStartRadius: 24}]} onPress={onLanguagePress} activeOpacity={0.7}>
             <Text style={styles.label}>{t('appSettings.language')}</Text>
             <View style={styles.languageRow}>
               <Text style={styles.languageValue}>{getLanguageLabel()}</Text>
-              <Text style={styles.chevron}>›</Text>
+              <CaretRight size={18} color={colors.textTertiary} weight="bold" />
             </View>
           </TouchableOpacity>
         </View>

@@ -11,6 +11,7 @@ import AssistantTabButton from './AssistantTabButton';
 import { useColors, fonts } from '../theme';
 import { useAppSettingsStore } from '../stores/useAppSettingsStore';
 import { triggerHaptic } from '../lib/haptics';
+import { t } from '../lib/i18n';
 
 const Tab = createBottomTabNavigator();
 
@@ -45,7 +46,7 @@ export default function MainTabs() {
           tabBarIcon: ({ focused, color }) => (
             <SquaresFour size={TAB_ICON_SIZE} color={color} weight='fill'  />
           ),
-          tabBarLabel: 'Home',
+          tabBarLabel: t('tabs.home'),
           listeners: ({ navigation }) => ({
             tabPress: () => {
               triggerHaptic(vibration);
@@ -61,7 +62,7 @@ export default function MainTabs() {
           tabBarIcon: ({ focused, color }) => (
             <FolderSimpleIcon size={TAB_ICON_SIZE} color={color} weight='fill'  />
           ),
-          tabBarLabel: 'Collections',
+          tabBarLabel: t('tabs.collections'),
           listeners: () => ({
             tabPress: () => triggerHaptic(vibration),
           }),
@@ -81,7 +82,7 @@ export default function MainTabs() {
         component={PlaceholderScreen}
         options={{
           tabBarButton: (props) => <AssistantTabButton {...props} />,
-          tabBarLabel: 'Ask Expert',
+          tabBarLabel: t('tabs.askExpert'),
         }}
       />
       <Tab.Screen
@@ -91,7 +92,7 @@ export default function MainTabs() {
           tabBarIcon: ({ focused, color }) => (
             <User size={TAB_ICON_SIZE} color={color} weight='fill' />
           ),
-          tabBarLabel: 'Profile',
+          tabBarLabel: t('tabs.profile'),
           listeners: () => ({
             tabPress: () => triggerHaptic(vibration),
           }),

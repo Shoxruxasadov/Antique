@@ -19,11 +19,34 @@
       "usesAppleSignIn": true,
       "buildNumber": "13",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDevelopmentRegion": "en",
+        "CFBundleDisplayName": "AntiqPro",
+        "CFBundleLocalizations": [
+          "en",
+          "uz",
+          "es",
+          "fr",
+          "de",
+          "it",
+          "pt",
+          "ja",
+          "ko",
+          "zh-Hans",
+          "ar",
+          "ru",
+          "nl",
+          "tr",
+          "pl",
+          "sv",
+          "th",
+          "he",
+          "hi"
+        ]
       }
     },
     "android": {
-      "icon": "./assets/logo.png",
+      "icon": "./assets/radial_logo.png",
       "edgeToEdgeEnabled": true,
       "statusBar": {
         "translucent": true,

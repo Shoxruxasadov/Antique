@@ -31,6 +31,7 @@ import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
 import { useLocalCollectionStore, SAVED_COLLECTION_NAME, LOCAL_SAVED_ID } from '../../stores/useLocalCollectionStore';
 import { syncLocalCollectionToSupabase } from '../../lib/syncLocalCollection';
 import { formatPriceUsd, getDisplayMarketValueUsd } from '../../lib/currency';
+import { t } from '../../lib/i18n';
 
 const THUMB_GAP = 7;
 const THUMB_COUNT = 2;
@@ -416,12 +417,12 @@ export default function CollectionScreen({ navigation, route }) {
     const isLocal = String(snapId).startsWith('local-');
     closeHistoryOptionsSheet(() => {
       Alert.alert(
-        'Delete snap',
-        'Remove this item from your scan history?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
+t('home.removeFromHistoryTitle'),
+            t('home.removeFromHistoryMessage'),
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              {
+                text: t('common.delete'),
             style: 'destructive',
             onPress: async () => {
               if (isLocal || !user?.id) {
@@ -447,7 +448,7 @@ export default function CollectionScreen({ navigation, route }) {
     const name = spaceName.trim();
     if (!name || !user?.id || !supabase) return;
     if (name === SAVED_COLLECTION_NAME) {
-      Alert.alert('Reserved name', `"${SAVED_COLLECTION_NAME}" is the default collection name and cannot be used.`);
+      Alert.alert(t('collection.reservedNameAlert'), t('collection.savedDefaultName'));
       return;
     }
     setCreating(true);
@@ -565,7 +566,7 @@ export default function CollectionScreen({ navigation, route }) {
       {/* Header — card 0 */}
       <Animated.View style={{ opacity: cardAnims[0].opacity, transform: [{ translateY: cardAnims[0].translateY }] }}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Collections</Text>
+          <Text style={styles.headerTitle}>{t('collection.title')}</Text>
           <Pressable
             style={styles.addBtn}
             onPress={() => {
@@ -611,7 +612,7 @@ export default function CollectionScreen({ navigation, route }) {
                       activeTab === name && styles.tabTextActive,
                     ]}
                   >
-                    {name === 'details' ? 'Collections' : 'History'}
+                    {name === 'details' ? t('collection.title') : t('collection.history')}
                   </Text>
                 </Pressable>
               ))}
@@ -646,8 +647,8 @@ export default function CollectionScreen({ navigation, route }) {
                   ]}
                 >
                   <CollectionCard
-                    title={coll.collection_name}
-                    count={`${Array.isArray(coll.antiques_ids) ? coll.antiques_ids.length : 0} Items`}
+                    title={coll.collection_name === SAVED_COLLECTION_NAME ? t('collection.savedName') : coll.collection_name}
+                    count={`${Array.isArray(coll.antiques_ids) ? coll.antiques_ids.length : 0} ${t('collection.itemsCount')}`}
                     thumbnails={getCollectionThumbnails(coll)}
                     onPress={() => {
                       returnedFromChildRef.current = true;
@@ -668,7 +669,7 @@ export default function CollectionScreen({ navigation, route }) {
                       }
                       mainStack?.navigate('CollectionDetail', {
                         collectionId: coll.id,
-                        collectionName: coll.collection_name,
+                        collectionName: coll.collection_name === SAVED_COLLECTION_NAME ? t('collection.savedName') : coll.collection_name,
                         antiquesIds: ids,
                         isSavedCollection: coll.collection_name === SAVED_COLLECTION_NAME,
                         ...(localItems && { localItems }),
@@ -694,8 +695,8 @@ export default function CollectionScreen({ navigation, route }) {
                 style={styles.emptyHistoryImage}
                 resizeMode="contain"
               />
-              <Text style={styles.emptyHistoryText}>Collection is empty</Text>
-              <Text style={styles.emptyHistorySubtext}>Tap + to create a space</Text>
+              <Text style={styles.emptyHistoryText}>{t('collection.empty')}</Text>
+              <Text style={styles.emptyHistorySubtext}>{t('collection.tapToCreateSpace')}</Text>
             </Animated.View>
           )
         ) : (
@@ -720,7 +721,7 @@ export default function CollectionScreen({ navigation, route }) {
                   resizeMode="contain"
                 />
                 <Text style={styles.emptyHistoryText}>
-                  {fetchError ? 'Ma\'lumotlar yuklanmadi' : 'Snap history is empty'}
+                  {fetchError ? t('collection.dataLoadFailed') : t('collection.snapHistoryEmpty')}
                 </Text>
               </Animated.View>
             ) : (
@@ -811,13 +812,13 @@ export default function CollectionScreen({ navigation, route }) {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowCreateModal(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Create Space</Text>
-            <Text style={styles.modalLabel}>Name of Space</Text>
+            <Text style={styles.modalTitle}>{t('collection.createSpace')}</Text>
+            <Text style={styles.modalLabel}>{t('collection.nameOfSpace')}</Text>
             <TextInput
               style={styles.modalInput}
               value={spaceName}
               onChangeText={setSpaceName}
-              placeholder="ex: Vase Collection"
+              placeholder={t('collection.namePlaceholder')}
               placeholderTextColor={colors.textTertiary}
               editable={!creating}
             />
@@ -827,7 +828,7 @@ export default function CollectionScreen({ navigation, route }) {
                 onPress={() => setShowCreateModal(false)}
                 disabled={creating}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('collection.cancel')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.modalCreateBtn, creating && styles.modalCreateBtnDisabled]}
@@ -837,7 +838,7 @@ export default function CollectionScreen({ navigation, route }) {
                 {creating ? (
                   <ActivityIndicator size="small" color={colors.textWhite} />
                 ) : (
-                  <Text style={styles.modalCreateText}>Create</Text>
+                  <Text style={styles.modalCreateText}>{t('collection.create')}</Text>
                 )}
               </Pressable>
             </View>
@@ -864,10 +865,10 @@ export default function CollectionScreen({ navigation, route }) {
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Options</Text>
+              <Text style={styles.sheetTitle}>{t('collection.options')}</Text>
               <Pressable style={styles.sheetRow} onPress={handleDeleteSnap}>
                 <Trash size={22} color={colors.red} />
-                <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Delete</Text>
+                <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>{t('collection.delete')}</Text>
               </Pressable>
             </Pressable>
           </Animated.View>

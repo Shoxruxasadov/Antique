@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { pickAndResizeAvatar } from '../../lib/pickImage';
 import { User } from 'phosphor-react-native';
 import { useColors, fonts } from '../../theme';
+import { t } from '../../lib/i18n';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { uploadAvatar } from '../../lib/avatarStorage';
@@ -134,7 +135,7 @@ export default function EditProfileScreen({ navigation }) {
           >
             <CaretLeft size={24} color={colors.textBase} weight="bold" />
           </TouchableOpacity>
-          <Text style={styles.title}>Edit Profile</Text>
+          <Text style={styles.title}>{t('settings.editProfile.title')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -157,12 +158,12 @@ export default function EditProfileScreen({ navigation }) {
 
           {/* Full Name */}
           <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Full Name</Text>
+            <Text style={styles.label}>{t('settings.editProfile.fullName')}</Text>
             <TextInput
               style={styles.input}
               value={fullName}
               onChangeText={setFullName}
-              placeholder="John Anderson"
+              placeholder={t('settings.editProfile.fullNamePlaceholder')}
               placeholderTextColor={colors.textTertiary}
               autoCapitalize="words"
               editable={!saving}
@@ -171,11 +172,11 @@ export default function EditProfileScreen({ navigation }) {
 
           {/* Email — faqat ko‘rsatish, tahrirlash mumkin emas */}
           <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('settings.editProfile.email')}</Text>
             <TextInput
               style={[styles.input, styles.inputDisabled]}
               value={email}
-              placeholder="johnanderson@gmail.com"
+              placeholder={t('settings.editProfile.emailPlaceholder')}
               placeholderTextColor={colors.textTertiary}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -194,7 +195,7 @@ export default function EditProfileScreen({ navigation }) {
             {saving ? (
               <ActivityIndicator color={colors.textWhite} />
             ) : (
-              <Text style={styles.saveBtnText}>Save Changes</Text>
+              <Text style={styles.saveBtnText}>{t('settings.editProfile.saveChanges')}</Text>
             )}
           </Pressable>
         </View>

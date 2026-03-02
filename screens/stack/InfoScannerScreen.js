@@ -9,13 +9,14 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, fonts } from '../../theme';
+import { t } from '../../lib/i18n';
 
 const GOOD_IMAGE = require('../../assets/scanner/Group1.png');
 const BAD_IMAGES = [
   require('../../assets/scanner/Group2.png'),
   require('../../assets/scanner/Group3.png'),
 ];
-const BAD_LABELS = ['Too close', 'Blurry'];
+const BAD_LABEL_KEYS = ['infoScanner.tooClose', 'infoScanner.blurry'];
 
 const TOP_SIZE = 156;
 const BOTTOM_SIZE = 96;
@@ -68,12 +69,12 @@ export default function InfoScannerScreen({ navigation }) {
       <StatusBar style="light" />
 
       <View style={styles.scrollView}>
-        <Text style={styles.mainTitle}>Snap Tips</Text>
+        <Text style={styles.mainTitle}>{t('infoScanner.snapTips')}</Text>
 
         <View style={styles.goodWrap}>
           <TipCircle
             source={GOOD_IMAGE}
-            label="Snap the item from the front"
+            label={t('infoScanner.snapFront')}
             size={TOP_SIZE}
             styles={styles}
           />
@@ -83,7 +84,7 @@ export default function InfoScannerScreen({ navigation }) {
           <View style={styles.badItem}>
             <TipCircle
               source={BAD_IMAGES[0]}
-              label={BAD_LABELS[0]}
+              label={t(BAD_LABEL_KEYS[0])}
               size={BOTTOM_SIZE}
               styles={styles}
             />
@@ -91,7 +92,7 @@ export default function InfoScannerScreen({ navigation }) {
           <View style={styles.badItem}>
             <TipCircle
               source={BAD_IMAGES[1]}
-              label={BAD_LABELS[1]}
+              label={t(BAD_LABEL_KEYS[1])}
               size={BOTTOM_SIZE}
               styles={styles}
             />
@@ -101,7 +102,7 @@ export default function InfoScannerScreen({ navigation }) {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
         <Pressable style={styles.doneButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.doneButtonText}>Understand</Text>
+          <Text style={styles.doneButtonText}>{t('infoScanner.understand')}</Text>
         </Pressable>
       </View>
     </View>

@@ -33,6 +33,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useLocalCollectionStore, LOCAL_SAVED_ID } from '../../stores/useLocalCollectionStore';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
+import { t } from '../../lib/i18n';
 import { formatPriceUsd, getDisplayMarketValueUsd } from '../../lib/currency';
 
 export default function CollectionDetailScreen({ route, navigation }) {
@@ -306,12 +307,12 @@ export default function CollectionDetailScreen({ route, navigation }) {
     if (!selectedItem?.id || !collectionId) return;
     closeItemOptionsSheet(() => {
       Alert.alert(
-        'Remove from collection',
+        t('collectionDetail.removeFromCollection'),
         `Remove "${selectedItem.name || 'this item'}" from this collection?`,
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Remove',
+            text: t('common.remove'),
             style: 'destructive',
             onPress: async () => {
               if (collectionId === LOCAL_SAVED_ID) {
@@ -443,12 +444,12 @@ export default function CollectionDetailScreen({ route, navigation }) {
   const handleDeleteCollection = () => {
     closeOptionsSheet(() => {
       Alert.alert(
-      'Delete collection',
+      t('collectionDetail.deleteCollection'),
       'Are you sure? This cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             if (!collectionId || !supabase) return;
@@ -508,7 +509,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
             style={styles.emptyImage}
             resizeMode="contain"
           />
-          <Text style={styles.emptyText}>Collection is empty</Text>
+          <Text style={styles.emptyText}>{t('collectionDetail.empty')}</Text>
         </View>
       ) : (
         <ScrollView
@@ -518,27 +519,27 @@ export default function CollectionDetailScreen({ route, navigation }) {
         >
           {/* Analytics */}
           <View style={styles.analyticsCard}>
-            <Text style={styles.analyticsLabel}>Total collection value</Text>
+            <Text style={styles.analyticsLabel}>{t('collectionDetail.totalValue')}</Text>
             <Text style={styles.analyticsTotal}>
               {formatPriceUsd(analytics.total, displayCurrency, rate)}
             </Text>
           </View>
           <View style={styles.analyticsRow}>
             <View style={styles.analyticsSmallCard}>
-              <Text style={styles.analyticsSmallLabel}>Lowest Antique</Text>
+              <Text style={styles.analyticsSmallLabel}>{t('collectionDetail.lowestAntique')}</Text>
               <Text style={styles.analyticsSmallValue}>
                 {formatPriceUsd(analytics.lowest, displayCurrency, rate)}
               </Text>
             </View>
             <View style={styles.analyticsSmallCard}>
-              <Text style={styles.analyticsSmallLabel}>Highest Antique</Text>
+              <Text style={styles.analyticsSmallLabel}>{t('collectionDetail.highestAntique')}</Text>
               <Text style={styles.analyticsSmallValue}>
                 {formatPriceUsd(analytics.highest, displayCurrency, rate)}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.itemsHeading}>Items</Text>
+          <Text style={styles.itemsHeading}>{t('collectionDetail.items')}</Text>
 
           {viewMode === 'listExtended' ? (
             <View style={styles.listExtendedWrap}>
@@ -677,22 +678,22 @@ export default function CollectionDetailScreen({ route, navigation }) {
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Options</Text>
+              <Text style={styles.sheetTitle}>{t('collectionDetail.options')}</Text>
               {!isSavedCollection && (
                 <>
                   <Pressable style={styles.sheetRow} onPress={openRename}>
                     <PencilSimpleIcon size={22} color={colors.textBase} weight='bold' />
-                    <Text style={styles.sheetRowText}>Rename</Text>
+                    <Text style={styles.sheetRowText}>{t('collectionDetail.rename')}</Text>
                   </Pressable>
                   <Pressable style={styles.sheetRow} onPress={handleDeleteCollection}>
                     <Trash size={22} color={colors.red} weight='bold' />
-                    <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Delete collection</Text>
+                    <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>{t('collectionDetail.deleteCollection')}</Text>
                   </Pressable>
                 </>
               )}
               {isSavedCollection && (
                 <Text style={[styles.sheetRowText, styles.sheetRowSubtext, { paddingVertical: 14 }]}>
-                  Saved collection cannot be renamed or deleted.
+                  {t('collectionDetail.savedCannotRename')}
                 </Text>
               )}
             </Pressable>
@@ -719,7 +720,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Options</Text>
+              <Text style={styles.sheetTitle}>{t('collectionDetail.options')}</Text>
               {user?.id ? (
                 <Pressable
                   style={styles.sheetRow}
@@ -728,12 +729,12 @@ export default function CollectionDetailScreen({ route, navigation }) {
                   }}
                 >
                   <ArrowsClockwiseIcon size={22} color={colors.textBase} weight='bold' />
-                  <Text style={styles.sheetRowText}>Change space</Text>
+                  <Text style={styles.sheetRowText}>{t('collectionDetail.changeSpace')}</Text>
                 </Pressable>
               ) : null}
               <Pressable style={styles.sheetRow} onPress={handleRemoveItemFromCollection}>
                 <Trash size={22} color={colors.red} />
-                <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>Remove from collection</Text>
+                <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>{t('collectionDetail.removeFromCollection')}</Text>
               </Pressable>
             </Pressable>
           </Animated.View>
@@ -759,13 +760,13 @@ export default function CollectionDetailScreen({ route, navigation }) {
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Change space</Text>
+              <Text style={styles.sheetTitle}>{t('collectionDetail.changeSpace')}</Text>
               {loadingSpaces ? (
                 <View style={styles.sheetLoading}>
                   <ActivityIndicator size="small" color={colors.brand} />
                 </View>
               ) : otherCollections.length === 0 ? (
-                <Text style={styles.sheetEmptyText}>No other spaces. Create one from Collections.</Text>
+                <Text style={styles.sheetEmptyText}>{t('collectionDetail.noOtherSpaces')}</Text>
               ) : (
                 <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
                   {otherCollections.map((coll) => (
@@ -800,13 +801,13 @@ export default function CollectionDetailScreen({ route, navigation }) {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowEditModal(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Edit Space</Text>
-            <Text style={styles.modalLabel}>Name of Space</Text>
+            <Text style={styles.modalTitle}>{t('collectionDetail.editSpace')}</Text>
+            <Text style={styles.modalLabel}>{t('collectionDetail.nameOfSpace')}</Text>
             <TextInput
               style={styles.modalInput}
               value={editName}
               onChangeText={setEditName}
-              placeholder="ex: Vase Collection"
+              placeholder={t('collectionDetail.namePlaceholder')}
               placeholderTextColor={colors.textTertiary}
               editable={!saving}
             />
@@ -816,7 +817,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
                 onPress={() => setShowEditModal(false)}
                 disabled={saving}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('collectionDetail.cancel')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.modalCreateBtn, saving && styles.modalCreateBtnDisabled]}
@@ -826,7 +827,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
                 {saving ? (
                   <ActivityIndicator size="small" color={colors.textWhite} />
                 ) : (
-                  <Text style={styles.modalCreateText}>Save</Text>
+                  <Text style={styles.modalCreateText}>{t('collectionDetail.save')}</Text>
                 )}
               </Pressable>
             </View>

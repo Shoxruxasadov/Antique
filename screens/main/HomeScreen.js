@@ -32,6 +32,7 @@ import { formatPriceUsd, getDisplayMarketValueUsd } from "../../lib/currency";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { fetchLatestBlogs } from "../../lib/blogApi";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
+import { t } from "../../lib/i18n";
 
 const CARD_COUNT = 6;
 const DELAY_STEP = 70;
@@ -447,12 +448,12 @@ export default function HomeScreen({ navigation }) {
     const isLocal = Boolean(snap?.antique);
     closeHistoryOptionsSheet(() => {
       Alert.alert(
-        "Remove from history",
-        "Remove this item from your scan history?",
+        t("home.removeFromHistoryTitle"),
+        t("home.removeFromHistoryMessage"),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Remove",
+            text: t("home.remove"),
             style: "destructive",
             onPress: async () => {
               if (isLocal) {
@@ -619,7 +620,7 @@ export default function HomeScreen({ navigation }) {
                 </Text>
                 <Text style={styles.currencyCode}>{preferredCurrency}</Text>
               </View>
-              <Text style={styles.currencyLabel}>Preferred Currency</Text>
+              <Text style={styles.currencyLabel}>{t("home.preferredCurrency")}</Text>
             </Pressable>
             <Pressable
               style={styles.proBtn}
@@ -662,7 +663,7 @@ export default function HomeScreen({ navigation }) {
                   color={colors.textWhite}
                   weight="fill"
                 />
-                <Text style={styles.proBtnText}>PRO</Text>
+                <Text style={styles.proBtnText}>{t("home.pro")}</Text>
               </View>
             </Pressable>
           </View>
@@ -682,14 +683,14 @@ export default function HomeScreen({ navigation }) {
               resizeMode="contain"
             />
             <Text style={styles.mainCardTitle}>
-              AI Powered Antique item Identifier.
+              {t("home.mainCardTitle")}
             </Text>
             <Pressable
               style={styles.identifyBtn}
               onPress={() => mainStack?.navigate("Identify")}
             >
               <Camera size={22} color={colors.textInverse} />
-              <Text style={styles.identifyBtnText}>Identify Now</Text>
+              <Text style={styles.identifyBtnText}>{t("home.identifyNow")}</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -702,7 +703,7 @@ export default function HomeScreen({ navigation }) {
             transform: [{ translateY: cardAnims[2].translateY }],
           }}
         >
-          <Text style={styles.sectionTitle}>Snap History</Text>
+          <Text style={styles.sectionTitle}>{t("home.snapHistory")}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -806,7 +807,7 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.seeAllCircle}>
                   <CaretRight size={22} color={colors.brand} />
                 </View>
-                <Text style={styles.seeAllText}>See All</Text>
+                <Text style={styles.seeAllText}>{t("home.seeAll")}</Text>
               </Pressable>
           </ScrollView>
         </Animated.View>
@@ -819,7 +820,7 @@ export default function HomeScreen({ navigation }) {
             transform: [{ translateY: cardAnims[3].translateY }],
           }}
         >
-          <Text style={styles.sectionTitle}>Collectors Blog</Text>
+          <Text style={styles.sectionTitle}>{t("home.collectorsBlog")}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -831,7 +832,7 @@ export default function HomeScreen({ navigation }) {
                 style={[styles.blogCard, styles.blogEmptyCard, { width: blogCardWidth }]}
                 onPress={() => mainStack?.navigate("AllPosts")}
               >
-                <Text style={styles.blogEmptyCardText}>No posts yet</Text>
+                <Text style={styles.blogEmptyCardText}>{t("home.noPosts")}</Text>
               </Pressable>
             ) : (
               blogPosts.map((post) => (
@@ -878,7 +879,7 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.seeAllCircle}>
                   <CaretRight size={22} color={colors.brand} />
                 </View>
-                <Text style={styles.seeAllText}>See All</Text>
+                <Text style={styles.seeAllText}>{t("home.seeAll")}</Text>
               </Pressable>
             )}
           </ScrollView>
@@ -916,11 +917,11 @@ export default function HomeScreen({ navigation }) {
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Options</Text>
+              <Text style={styles.sheetTitle}>{t("home.options")}</Text>
               <Pressable style={styles.sheetRow} onPress={handleDeleteSnap}>
                 <Trash size={22} color={colors.red} />
                 <Text style={[styles.sheetRowText, styles.sheetRowTextDanger]}>
-                  Delete
+                  {t("home.delete")}
                 </Text>
               </Pressable>
             </Pressable>

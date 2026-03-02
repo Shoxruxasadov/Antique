@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft } from 'phosphor-react-native';
 import { useColors, fonts } from '../../theme';
+import { t } from '../../lib/i18n';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -46,14 +47,14 @@ export default function ForgotPasswordScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <Text style={styles.title}>Reset password</Text>
+        <Text style={styles.title}>{t('auth.forgotPassword.title')}</Text>
         <Text style={styles.subtitle}>
           To reset your password please enter your email
         </Text>
 
         <TextInput
           style={styles.input}
-          placeholder="Enter your email"
+          placeholder={t('auth.forgotPassword.emailPlaceholder')}
           placeholderTextColor={colors.textTertiary}
           value={email}
           onChangeText={setEmail}
@@ -63,7 +64,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         />
 
         <Pressable style={styles.primaryBtn}>
-          <Text style={styles.primaryBtnText}>Send Code</Text>
+          <Text style={styles.primaryBtnText}>{t('auth.forgotPassword.sendCode')}</Text>
         </Pressable>
       </KeyboardAvoidingView>
     </View>

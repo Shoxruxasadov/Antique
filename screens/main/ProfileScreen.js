@@ -35,49 +35,20 @@ import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useOnboardingStore } from "../../stores/useOnboardingStore";
 import { useAppSettingsStore } from "../../stores/useAppSettingsStore";
+import { t } from "../../lib/i18n";
 
 const GENERAL_ITEMS = [
-  {
-    id: "subscription",
-    Icon: CrownSimpleIcon,
-    label: "Manage Subscription",
-    route: "Pro",
-  },
-  { id: "restore", Icon: ArrowsClockwise, label: "Restore Membership", route: null },
-  {
-    id: "currency",
-    Icon: CurrencyDollar,
-    label: "Preferred Currency",
-    route: "PreferredCurrency",
-  },
-  {
-    id: "settings",
-    Icon: Gear,
-    label: "App Settings",
-    route: "AppSettings",
-  },
+  { id: "subscription", Icon: CrownSimpleIcon, labelKey: "profile.manageSubscription", route: "Pro" },
+  { id: "restore", Icon: ArrowsClockwise, labelKey: "profile.restoreMembership", route: null },
+  { id: "currency", Icon: CurrencyDollar, labelKey: "profile.preferredCurrency", route: "PreferredCurrency" },
+  { id: "settings", Icon: Gear, labelKey: "profile.appSettings", route: "AppSettings" },
 ];
 
 const OTHER_ITEMS = [
-  {
-    id: "privacy",
-    Icon: FileText,
-    label: "Privacy policy",
-    route: null,
-  },
-  {
-    id: "terms",
-    Icon: FileText,
-    label: "Terms of use",
-    route: null,
-  },
-  {
-    id: "support",
-    Icon: Headset,
-    label: "Contact support",
-    route: null,
-  },
-  { id: "rate", Icon: Star, label: "Rate the app", route: null },
+  { id: "privacy", Icon: FileText, labelKey: "profile.privacyPolicy", route: null },
+  { id: "terms", Icon: FileText, labelKey: "profile.termsOfUse", route: null },
+  { id: "support", Icon: Headset, labelKey: "profile.contactSupport", route: null },
+  { id: "rate", Icon: Star, labelKey: "profile.rateApp", route: null },
 ];
 
 function RowItem({ Index, Icon, label, value, onPress, styles, colors }) {
@@ -290,15 +261,15 @@ export default function ProfileScreen({ navigation }) {
   const handleRestore = useCallback(async () => {
     const info = await restorePurchases();
     if (info == null) {
-      Alert.alert("Error", "Could not restore purchases. Please try again.");
+      Alert.alert(t('common.error'), t('pro.restoreError'), [{ text: t('common.ok') }]);
       return;
     }
     const hasActive = info.entitlements?.active && Object.keys(info.entitlements.active).length > 0;
     if (!hasActive) {
-      Alert.alert("No purchases to restore", "No previous membership found for this account.");
+      Alert.alert(t('pro.noPurchasesTitle'), t('pro.noPreviousMembership'), [{ text: t('common.ok') }]);
       return;
     }
-    Alert.alert("Success", "Membership restored.");
+    Alert.alert(t('pro.successTitle'), t('pro.membershipRestored'), [{ text: t('common.ok') }]);
   }, []);
 
   const navigateTo = (route) => {
@@ -359,7 +330,7 @@ export default function ProfileScreen({ navigation }) {
             transform: [{ translateY: cardAnims[0].translateY }],
           }}
         >
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitle}>{t("profile.title")}</Text>
         </Animated.View>
 
         {/* User card — card 1: logged in (name, email, edit) yoki login */}
@@ -383,10 +354,10 @@ export default function ProfileScreen({ navigation }) {
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName} numberOfLines={1}>
-                {user ? user.full_name || user.email || "User" : "Anonym User"}
+                {user ? user.full_name || user.email || t('profile.user') : t('profile.anonymUser')}
               </Text>
               <Text style={styles.userHint} numberOfLines={1}>
-                {user ? user.email || "" : "Please login"}
+                {user ? user.email || "" : t('profile.pleaseLogin')}
               </Text>
             </View>
             {user ? (
@@ -401,7 +372,7 @@ export default function ProfileScreen({ navigation }) {
                 style={styles.loginBtn}
                 onPress={() => navigateTo("GetStarted")}
               >
-                <Text style={styles.loginBtnText}>Login</Text>
+                <Text style={styles.loginBtnText}>{t("profile.login")}</Text>
               </Pressable>
             )}
           </View>
@@ -414,14 +385,14 @@ export default function ProfileScreen({ navigation }) {
             transform: [{ translateY: cardAnims[2].translateY }],
           }}
         >
-          <Text style={styles.sectionTitle}>General</Text>
+          <Text style={styles.sectionTitle}>{t("profile.general")}</Text>
           <View style={styles.sectionCard}>
             {GENERAL_ITEMS.map((item, index) => (
               <RowItem
                 key={item.id}
                 Index={index}
                 Icon={item.Icon}
-                label={item.label}
+                label={t(item.labelKey)}
                 value={item.id === "currency" ? preferredCurrency : item.value}
                 onPress={
                   item.id === "restore"
@@ -444,14 +415,14 @@ export default function ProfileScreen({ navigation }) {
             transform: [{ translateY: cardAnims[3].translateY }],
           }}
         >
-          <Text style={styles.sectionTitle}>Other</Text>
+          <Text style={styles.sectionTitle}>{t("profile.other")}</Text>
           <View style={styles.sectionCard}>
             {OTHER_ITEMS.map((item, index) => (
               <RowItem
                 key={item.id}
                 Index={index}
                 Icon={item.Icon}
-                label={item.label}
+                label={t(item.labelKey)}
                 onPress={
                   item.id === 'rate'
                     ? () => void requestAppReview()
@@ -482,7 +453,7 @@ export default function ProfileScreen({ navigation }) {
           >
             <Pressable style={styles.logoutBtn} onPress={handleLogout}>
               <SignOut size={22} color={colors.red} weight="regular" />
-              <Text style={[styles.logoutBtnText, {color: colors.red}]}>Log out</Text>
+              <Text style={[styles.logoutBtnText, {color: colors.red}]}>{t("profile.logout")}</Text>
             </Pressable>
           </Animated.View>
         ) : null}

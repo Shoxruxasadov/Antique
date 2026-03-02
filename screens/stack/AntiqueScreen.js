@@ -36,6 +36,7 @@ import {
   Cube,
   Eye,
   ArrowSquareOut,
+  CaretRight,
   ShareNetwork,
   Trash,
 } from "phosphor-react-native";
@@ -54,6 +55,8 @@ import {
   fetchMarketPricesFromEbay,
   buildEbaySearchQueryFromAntique,
 } from "../../lib/ebay";
+import { t } from "../../lib/i18n";
+import { SAVED_COLLECTION_NAME } from "../../stores/useLocalCollectionStore";
 
 const TAB_NAMES = ["details", "condition", "history"];
 
@@ -328,6 +331,21 @@ export default function AntiqueScreen({ route, navigation }) {
   const firstEbayUrl =
     displayEbayLinks[0] ?? displayEbayItems[0]?.itemWebUrl ?? null;
 
+  const ebayGridItems = useMemo(() => {
+    const items = (displayEbayItems || []).filter((it) => it?.itemWebUrl);
+    if (items.length === 0) return [];
+    const withNum = items.map((it) => ({
+      ...it,
+      priceNum: parseFloat(String(it.price || "0")) || 0,
+    }));
+    const avg =
+      withNum.reduce((s, it) => s + it.priceNum, 0) / withNum.length || 0;
+    const sorted = [...withNum].sort(
+      (a, b) => Math.abs(a.priceNum - avg) - Math.abs(b.priceNum - avg)
+    );
+    return sorted.slice(0, 4);
+  }, [displayEbayItems]);
+
   useEffect(() => {
     if (Platform.OS === "android") {
       RNStatusBar.setTranslucent?.(true);
@@ -454,8 +472,8 @@ export default function AntiqueScreen({ route, navigation }) {
     }
     if (!antique?.id) {
       Alert.alert(
-        "Login required",
-        "Please sign in to add items to a collection.",
+        t("antique.loginRequired"),
+        t("antique.loginRequiredMessage"),
       );
       return;
     }
@@ -617,12 +635,12 @@ export default function AntiqueScreen({ route, navigation }) {
     closeOptionsSheet();
     if (fromHistory) {
       Alert.alert(
-        "Remove from history",
-        "Remove this item from your scan history?",
+        t("antique.removeFromHistoryTitle"),
+        t("antique.removeFromHistoryMessage"),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Remove",
+            text: t("common.remove"),
             style: "destructive",
             onPress: async () => {
               if (!user?.id || !antique?.id || !supabase) return;
@@ -636,8 +654,8 @@ export default function AntiqueScreen({ route, navigation }) {
                 navigation.goBack();
               } catch (e) {
                 Alert.alert(
-                  "Error",
-                  e?.message || "Failed to remove from history",
+                  t("common.error"),
+                  e?.message || t("antique.removeFromHistoryMessage"),
                 );
               }
             },
@@ -648,12 +666,12 @@ export default function AntiqueScreen({ route, navigation }) {
     }
     if (fromCollectionId) {
       Alert.alert(
-        "Remove from collection",
-        "Remove this item from the collection?",
+        t("antique.removeFromCollectionTitle"),
+        t("antique.removeFromCollectionMessage"),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Remove",
+            text: t("common.remove"),
             style: "destructive",
             onPress: async () => {
               if (!fromCollectionId || !antique?.id || !supabase) return;
@@ -673,8 +691,8 @@ export default function AntiqueScreen({ route, navigation }) {
                 navigation.goBack();
               } catch (e) {
                 Alert.alert(
-                  "Error",
-                  e?.message || "Failed to remove from collection",
+                  t("common.error"),
+                  e?.message || t("antique.removeFromCollectionMessage"),
                 );
               }
             },
@@ -684,12 +702,12 @@ export default function AntiqueScreen({ route, navigation }) {
       return;
     }
     Alert.alert(
-      "Delete item",
-      "Permanently delete this item? This cannot be undone.",
+      t("antique.deleteItemTitle"),
+      t("antique.deleteItemMessage"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Delete",
+          text: t("common.delete"),
           style: "destructive",
           onPress: async () => {
             if (!antique?.id || !supabase) return;
@@ -701,7 +719,7 @@ export default function AntiqueScreen({ route, navigation }) {
               if (error) throw error;
               navigation.goBack();
             } catch (e) {
-              Alert.alert("Error", e?.message || "Failed to delete");
+              Alert.alert(t("common.error"), e?.message || t("antique.deleteItemMessage"));
             }
           },
         },
@@ -724,8 +742,8 @@ export default function AntiqueScreen({ route, navigation }) {
       const ids = Array.isArray(coll.antiques_ids) ? coll.antiques_ids : [];
       if (ids.includes(antique.id)) {
         Alert.alert(
-          "Already added",
-          "This item is already in this collection.",
+          t("antique.alreadyAdded"),
+          t("antique.alreadyInCollection"),
         );
         return;
       }
@@ -740,9 +758,9 @@ export default function AntiqueScreen({ route, navigation }) {
         if (error) throw error;
         await refreshCollectionStatus();
         closeAddSheet();
-        Alert.alert("Added", "Item added to collection.");
+        Alert.alert(t("antique.addedTitle"), t("antique.addedToCollectionMessage"));
       } catch (e) {
-        Alert.alert("Error", e?.message || "Failed to add to collection");
+        Alert.alert(t("common.error"), e?.message || t("antique.addedToCollectionMessage"));
       }
     },
     [antique?.id, supabase, closeAddSheet, refreshCollectionStatus],
@@ -762,9 +780,9 @@ export default function AntiqueScreen({ route, navigation }) {
       if (error) throw error;
       await refreshCollectionStatus();
       closeAddSheet();
-      Alert.alert("Added", "New collection created and item added.");
+      Alert.alert(t("antique.addedTitle"), t("antique.newCollectionCreatedMessage"));
     } catch (e) {
-      Alert.alert("Error", e?.message || "Failed to create collection");
+      Alert.alert(t("common.error"), e?.message || t("antique.newCollectionCreatedMessage"));
     }
   }, [user?.id, antique?.id, supabase, closeAddSheet, refreshCollectionStatus]);
 
@@ -785,12 +803,12 @@ export default function AntiqueScreen({ route, navigation }) {
         style={[styles.container, styles.center, { paddingTop: insets.top }]}
       >
         <StatusBar style={colors.isDark ? 'light' : 'dark'} />
-        <Text style={styles.emptyText}>Item not found</Text>
+        <Text style={styles.emptyText}>{t("antique.itemNotFound")}</Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
         >
-          <Text style={styles.backBtnText}>Go back</Text>
+          <Text style={styles.backBtnText}>{t("antique.goBack")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -813,13 +831,14 @@ export default function AntiqueScreen({ route, navigation }) {
     return "bad"; // fair, poor, etc.
   };
 
-  const SPEC_LABELS = {
-    case_material: "Case Material",
-    glass_type: "Glass Type",
-    construction: "Construction",
-    era: "Era",
-    style: "Style",
-    dimensions: "Dimensions",
+  const SPEC_LABEL_KEYS = {
+    case_material: "antique.specCaseMaterial",
+    glass_type: "antique.specGlassType",
+    construction: "antique.specConstruction",
+    era: "antique.specEra",
+    style: "antique.specStyle",
+    dimensions: "antique.specDimensions",
+    origin: "antique.specOrigin",
   };
   const getSpecificationRows = (a) => {
     const spec = a?.specification;
@@ -831,20 +850,20 @@ export default function AntiqueScreen({ route, navigation }) {
     if (isEmpty) {
       const rows = [
         {
-          key: "Case Material",
+          key: "antique.specCaseMaterial",
           value:
             (Array.isArray(a?.category) ? a.category[0] : a?.category) || null,
         },
         {
-          key: "Era",
+          key: "antique.specEra",
           value: [a?.period_start_year, a?.period_end_year].filter(Boolean)
             .length
             ? `${a.period_start_year} – ${a.period_end_year}`
             : null,
         },
-        { key: "Origin", value: a?.origin_country || null },
+        { key: "antique.specOrigin", value: a?.origin_country || null },
       ].filter((r) => r.value);
-      return rows.length ? rows : [{ key: "—", value: "No specification" }];
+      return rows.length ? rows : [{ key: "antique.noSpecification", value: null }];
     }
     if (Array.isArray(spec))
       return spec.map(({ key, value }) => ({
@@ -862,7 +881,7 @@ export default function AntiqueScreen({ route, navigation }) {
       )
       .map(([k, v]) => ({
         key:
-          SPEC_LABELS[k] ||
+          SPEC_LABEL_KEYS[k] ||
           k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
         value: v ?? "—",
       }));
@@ -1002,7 +1021,7 @@ export default function AntiqueScreen({ route, navigation }) {
           <TouchableOpacity
             onPress={openOptionsSheet}
             style={styles.headerMenuBtn}
-            accessibilityLabel="More options"
+            accessibilityLabel={t("antique.moreOptions")}
           >
             <DotsThreeOutlineIcon
               size={22}
@@ -1054,7 +1073,7 @@ export default function AntiqueScreen({ route, navigation }) {
                 <TouchableOpacity
                   onPress={openOptionsSheet}
                   style={styles.headerMenuBtn}
-                  accessibilityLabel="More options"
+                  accessibilityLabel={t("antique.moreOptions")}
                 >
                   <DotsThreeOutlineIcon
                     size={22}
@@ -1093,26 +1112,26 @@ export default function AntiqueScreen({ route, navigation }) {
                 <Text style={styles.originLine}>
                   {antique.origin_country ?? "Unknown"} ·{" "}
                   {antique.period_start_year ?? 0} –{" "}
-                  {antique.period_end_year ?? 0} yrs
+                  {antique.period_end_year ?? 0} {t("antique.yrs")}
                 </Text>
               </View>
 
               <View style={styles.metricRow}>
                 <View style={[styles.metricCard, { width: cardWidth }]}>
                   <CalendarBlank size={24} color={colors.brand} />
-                  <Text style={styles.metricLabel}>Age</Text>
-                  <Text style={styles.metricValue}>{ageYrs} yrs</Text>
+                  <Text style={styles.metricLabel}>{t("antique.age")}</Text>
+                  <Text style={styles.metricValue}>{ageYrs} {t("antique.yrs")}</Text>
                 </View>
                 <View style={[styles.metricCard, { width: cardWidth }]}>
                   <Medal size={24} color={colors.brand} />
-                  <Text style={styles.metricLabel}>Rarity</Text>
+                  <Text style={styles.metricLabel}>{t("antique.rarity")}</Text>
                   <Text style={styles.metricValue}>
                     {rarityScore} / {rarityMax}
                   </Text>
                 </View>
                 <View style={[styles.metricCard, { width: cardWidth }]}>
                   <CheckCircle size={24} color={colors.brand} />
-                  <Text style={styles.metricLabel}>Condition</Text>
+                  <Text style={styles.metricLabel}>{t("antique.condition")}</Text>
                   <Text style={styles.metricValue}>
                     {antique.overall_condition_summary ?? "Good"}
                   </Text>
@@ -1122,14 +1141,14 @@ export default function AntiqueScreen({ route, navigation }) {
               <View style={styles.marketValueCard}>
                 <View style={styles.marketValueHeader}>
                   <TrendUp size={20} color={colors.brand} />
-                  <Text style={styles.marketValueTitle}>Market Analysis</Text>
+                  <Text style={styles.marketValueTitle}>{t("antique.marketAnalysis")}</Text>
                   <View style={styles.marketValueLiveTag}>
-                    <Text style={styles.marketValueLiveText}>LIVE DATA</Text>
+                    <Text style={styles.marketValueLiveText}>{t("antique.liveData")}</Text>
                   </View>
                 </View>
                 <View style={styles.marketValueCurrentBlock}>
                   <Text style={styles.marketValueCurrentLabel}>
-                    Current market value
+                    {t("antique.currentMarketValue")}
                   </Text>
                   <Text style={styles.marketValueCurrentValue}>
                     {displayPriceUsd > 0
@@ -1139,7 +1158,7 @@ export default function AntiqueScreen({ route, navigation }) {
                 </View>
                 <View style={styles.marketValueLowHighRow}>
                   <View style={styles.marketValueLowHighBlock}>
-                    <Text style={styles.marketValueLowHighLabel}>Low</Text>
+                    <Text style={styles.marketValueLowHighLabel}>{t("antique.low")}</Text>
                     <Text style={styles.marketValueLowHighValue}>
                       {displayLowUsd > 0
                         ? formatPriceUsd(displayLowUsd, displayCurrency, rate)
@@ -1147,7 +1166,7 @@ export default function AntiqueScreen({ route, navigation }) {
                     </Text>
                   </View>
                   <View style={styles.marketValueLowHighBlock}>
-                    <Text style={styles.marketValueLowHighLabel}>High</Text>
+                    <Text style={styles.marketValueLowHighLabel}>{t("antique.high")}</Text>
                     <Text style={styles.marketValueLowHighValue}>
                       {displayHighUsd > 0
                         ? formatPriceUsd(displayHighUsd, displayCurrency, rate)
@@ -1180,10 +1199,10 @@ export default function AntiqueScreen({ route, navigation }) {
                       ]}
                     >
                       {tab === "details"
-                        ? "Details"
+                        ? t("antique.tabDetails")
                         : tab === "condition"
-                          ? "Condition"
-                          : "History"}
+                          ? t("antique.tabCondition")
+                          : t("antique.tabHistory")}
                     </Text>
                   </Pressable>
                 ))}
@@ -1200,20 +1219,24 @@ export default function AntiqueScreen({ route, navigation }) {
               >
                 {activeTab === "details" && (
                   <View style={styles.tabPanel}>
-                    <Text style={styles.sectionTitle}>Description</Text>
+                    <Text style={styles.sectionTitle}>{t("antique.description")}</Text>
                     <Text style={styles.bodyText}>
-                      {antique.description || "No description available."}
+                      {antique.description || t("antique.noDescription")}
                     </Text>
 
                     <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-                      Specification
+                      {t("antique.specification")}
                     </Text>
                     <View style={styles.specList}>
                       {getSpecificationRows(antique).map(
                         ({ key: specKey, value }) => (
                           <View key={specKey} style={styles.specRow}>
-                            <Text style={styles.specLabel}>{specKey}</Text>
-                            <Text style={styles.specValue}>{value}</Text>
+                            <Text style={styles.specLabel}>
+                              {specKey.startsWith("antique.") ? t(specKey) : specKey}
+                            </Text>
+                            <Text style={styles.specValue}>
+                              {value ?? (specKey === "antique.noSpecification" ? t("antique.noSpecification") : "—")}
+                            </Text>
                           </View>
                         ),
                       )}
@@ -1223,7 +1246,7 @@ export default function AntiqueScreen({ route, navigation }) {
                       <View style={styles.originTitleRow}>
                         <MapPin size={18} color={colors.textBase} />
                         <Text style={styles.originTitle}>
-                          Origin & Provenance
+                          {t("antique.originProvenance")}
                         </Text>
                       </View>
                       <Text style={styles.originText}>
@@ -1243,17 +1266,17 @@ export default function AntiqueScreen({ route, navigation }) {
                         </Text>
                       </View>
                       <Text style={styles.conditionOverallTitle}>
-                        Overall Condition:{" "}
+                        {t("antique.overallCondition")}:{" "}
                         {antique.overall_condition_summary ?? "Good"}
                       </Text>
                       <Text style={styles.conditionOverallSubtitle}>
                         {antique.condition_description ||
-                          "Well-preserved with age-appropriate wear"}
+                          t("antique.wellPreserved")}
                       </Text>
                     </View>
                     <View style={styles.conditionList}>
                       <ConditionRow
-                        label="Mechanical Function"
+                        label={t("antique.conditionMechanical")}
                         status={antique.mechanical_function_status ?? "N/A"}
                         statusStyle={getConditionStyle(
                           "Mechanical Function",
@@ -1264,7 +1287,7 @@ export default function AntiqueScreen({ route, navigation }) {
                         colors={colors}
                       />
                       <ConditionRow
-                        label="Case Condition"
+                        label={t("antique.conditionCase")}
                         status={antique.case_condition_status ?? "N/A"}
                         statusStyle={getConditionStyle(
                           "Case Condition",
@@ -1275,7 +1298,7 @@ export default function AntiqueScreen({ route, navigation }) {
                         colors={colors}
                       />
                       <ConditionRow
-                        label="Dial & Hands"
+                        label={t("antique.conditionDialHands")}
                         status={antique.dial_hands_condition_status ?? "N/A"}
                         statusStyle={getConditionStyle(
                           "Dial & Hands",
@@ -1286,7 +1309,7 @@ export default function AntiqueScreen({ route, navigation }) {
                         colors={colors}
                       />
                       <ConditionRow
-                        label="Crystal"
+                        label={t("antique.conditionCrystal")}
                         status={antique.crystal_condition_status ?? "N/A"}
                         statusStyle={getConditionStyle(
                           "Crystal",
@@ -1302,22 +1325,22 @@ export default function AntiqueScreen({ route, navigation }) {
 
                 {activeTab === "history" && (
                   <View style={styles.tabPanel}>
-                    <Text style={styles.sectionTitle}>Acquisition Details</Text>
+                    <Text style={styles.sectionTitle}>{t("antique.acquisitionDetails")}</Text>
                     <View style={styles.acquisitionRows}>
                       <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Date Added</Text>
+                        <Text style={styles.metaLabel}>{t("antique.dateAdded")}</Text>
                         <Text style={styles.metaValue}>
                           {formatHistoryDate(antique.created_at)}
                         </Text>
                       </View>
                       <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Source</Text>
+                        <Text style={styles.metaLabel}>{t("antique.source")}</Text>
                         <Text style={styles.metaValue}>
-                          {antique.source || "AI Analysis"}
+                          {antique.source || t("antique.aiAnalysis")}
                         </Text>
                       </View>
                       <View style={[styles.metaRow, { borderBottomWidth: 0 }]}>
-                        <Text style={styles.metaLabel}>Purchase Price</Text>
+                        <Text style={styles.metaLabel}>{t("antique.purchasePrice")}</Text>
                         <Text style={styles.metaValue}>
                           {formatPurchasePrice(antique.purchase_price)}
                         </Text>
@@ -1325,12 +1348,12 @@ export default function AntiqueScreen({ route, navigation }) {
                     </View>
 
                     <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
-                      Item Timeline
+                      {t("antique.itemTimeline")}
                     </Text>
                     <View style={styles.timeline}>
                       <TimelineItem
                         Icon={Cube}
-                        title="Manufactured"
+                        title={t("antique.timelineManufactured")}
                         subtitle={`${antique.period_start_year || "?"}–${antique.period_end_year || "?"} • ${antique.origin_country || "Unknown"}`}
                         isFirst
                         isLast={false}
@@ -1339,8 +1362,8 @@ export default function AntiqueScreen({ route, navigation }) {
                       />
                       <TimelineItem
                         Icon={Eye}
-                        title="Identified"
-                        subtitle={`${formatHistoryDate(antique.created_at)} • AI Analysis`}
+                        title={t("antique.timelineIdentified")}
+                        subtitle={`${formatHistoryDate(antique.created_at)} • ${t("antique.aiAnalysis")}`}
                         isFirst={false}
                         isLast={false}
                         styles={styles}
@@ -1348,7 +1371,7 @@ export default function AntiqueScreen({ route, navigation }) {
                       />
                       <TimelineItem
                         Icon={CheckCircle}
-                        title="Condition Assessed"
+                        title={t("antique.timelineConditionAssessed")}
                         subtitle={`${formatHistoryDate(antique.created_at)} • Grade: ${antique.overall_condition_summary || "Good"} (${antique.condition_grade || "B+"})`}
                         isFirst={false}
                         isLast
@@ -1360,32 +1383,51 @@ export default function AntiqueScreen({ route, navigation }) {
                 )}
               </Animated.View>
 
-              {/* Sahifa oxirida: eBay’da sotib olish */}
+              {/* Sahifa oxirida: eBay o‘rtacha narx atrofidagi 4 ta mahsulot — 2 ustunli grid */}
               {loadingEbay ? (
                 <View style={[styles.ebayCard, styles.ebayCardLoading]}>
                   <ActivityIndicator size="small" color={colors.brand} />
-                  <Text style={styles.ebayLoadingText}>Loading eBay…</Text>
+                  <Text style={styles.ebayLoadingText}>{t("antique.loadingEbay")}</Text>
                 </View>
-              ) : hasEbayData && firstEbayUrl ? (
-                <View style={styles.ebayCard}>
+              ) : ebayGridItems.length > 0 ? (
+                <View style={styles.ebayGridWrap}>
                   <Text style={styles.ebaySectionTitle}>
-                    Buy this product on eBay
+                  {t("scanner.buySimilarEbay")}
                   </Text>
-                  <Text style={styles.ebayCardSubtext}>
-                    Shu mahsulotni eBay’da sotib olish mumkin
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.ebayPrimaryBtn}
-                    onPress={() => Linking.openURL(firstEbayUrl)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.ebayPrimaryBtnContent}>
-                      <ArrowSquareOut size={20} color={colors.textWhite} />
-                      <Text style={styles.ebayPrimaryBtnText}>
-                        Open on eBay
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+                  <View style={styles.ebayGrid}>
+                    {ebayGridItems.map((item, idx) => {
+                      const cardW = (width - 32 - 10) / 2;
+                      const url = item.itemWebUrl || firstEbayUrl;
+                      return (
+                        <Pressable
+                          key={idx}
+                          style={[styles.ebayGridCard, { width: cardW }]}
+                          onPress={() => url && Linking.openURL(url)}
+                        >
+                          <View style={styles.ebayGridCardImageWrap}>
+                            {item.imageUrl ? (
+                              <Image
+                                source={{ uri: item.imageUrl }}
+                                style={styles.ebayGridCardImage}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <View style={[styles.ebayGridCardImage, styles.ebayGridCardImagePlaceholder]} />
+                            )}
+                          </View>
+                          <Text style={styles.ebayGridCardTitle} numberOfLines={2}>
+                            {item.title || "eBay item"}
+                          </Text>
+                          <View style={styles.ebayGridCardBottom}>
+                            <Text style={styles.ebayGridCardPrice} numberOfLines={1}>
+                              {item.price ? `$${item.price}` : "—"}
+                            </Text>
+                            <CaretRight size={18} color={colors.textTertiary} weight="bold" />
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
               ) : null}
             </View>
@@ -1410,7 +1452,7 @@ export default function AntiqueScreen({ route, navigation }) {
                 if (collectionForLink) {
                   navigation.navigate("CollectionDetail", {
                     collectionId: collectionForLink.id,
-                    collectionName: collectionForLink.collection_name,
+                    collectionName: collectionForLink.collection_name === SAVED_COLLECTION_NAME ? t("collection.savedName") : collectionForLink.collection_name,
                     antiquesIds: collectionForLink.antiques_ids || [],
                   });
                 } else {
@@ -1418,11 +1460,11 @@ export default function AntiqueScreen({ route, navigation }) {
                 }
               }}
             >
-              <Text style={styles.addBtnText}>See your collection</Text>
+              <Text style={styles.addBtnText}>{t("antique.seeYourCollection")}</Text>
             </Pressable>
           ) : (
             <Pressable style={styles.addBtn} onPress={handleOpenAddSheet}>
-              <Text style={styles.addBtnText}>Add to Collection</Text>
+              <Text style={styles.addBtnText}>{t("antique.addToCollection")}</Text>
             </Pressable>
           )}
         </View>
@@ -1471,13 +1513,13 @@ export default function AntiqueScreen({ route, navigation }) {
                     weight="bold"
                   />
                   <Text style={styles.optionsSheetRowText}>
-                    Change Collection
+                    {t("antique.changeCollection")}
                   </Text>
                 </Pressable>
               )}
               <Pressable style={styles.optionsSheetRow} onPress={handleShare}>
                 <ShareNetwork size={22} color={colors.textBase} weight="bold" />
-                <Text style={styles.optionsSheetRowText}>Share</Text>
+                <Text style={styles.optionsSheetRowText}>{t("antique.share")}</Text>
               </Pressable>
               <Pressable
                 style={[styles.optionsSheetRow, styles.optionsSheetRowDanger]}
@@ -1491,10 +1533,10 @@ export default function AntiqueScreen({ route, navigation }) {
                   ]}
                 >
                   {fromHistory
-                    ? "Remove from history"
+                    ? t("home.removeFromHistoryTitle")
                     : fromCollectionId
-                      ? "Remove from collection"
-                      : "Delete item"}
+                      ? t("collectionDetail.removeFromCollection")
+                      : t("common.delete")}
                 </Text>
               </Pressable>
             </Pressable>
@@ -1533,14 +1575,14 @@ export default function AntiqueScreen({ route, navigation }) {
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Add to Collection</Text>
+              <Text style={styles.sheetTitle}>{t("antique.addToCollectionSheet")}</Text>
               {loadingCollections ? (
                 <View style={styles.sheetLoading}>
                   <ActivityIndicator size="small" color={colors.brand} />
                 </View>
               ) : collections.length === 0 ? (
                 <View style={styles.sheetEmpty}>
-                  <Text style={styles.sheetEmptyText}>No collections yet</Text>
+                  <Text style={styles.sheetEmptyText}>{t("antique.noCollectionsYet")}</Text>
                   <Pressable
                     style={[styles.sheetRow, styles.sheetRowCreate]}
                     onPress={handleCreateNewCollection}
@@ -1549,7 +1591,7 @@ export default function AntiqueScreen({ route, navigation }) {
                     <Text
                       style={[styles.sheetRowText, { color: colors.brand }]}
                     >
-                      Create new collection
+                      {t("antique.createNewCollection")}
                     </Text>
                   </Pressable>
                 </View>
@@ -1570,9 +1612,9 @@ export default function AntiqueScreen({ route, navigation }) {
                         style={styles.sheetRow}
                         onPress={() =>
                           alreadyIn
-                            ? Alert.alert(
-                                "Already added",
-                                "This item is already in this collection.",
+                            ?                             Alert.alert(
+                                t("antique.alreadyAdded"),
+                                t("antique.alreadyInCollection"),
                               )
                             : addAntiqueToCollection(coll)
                         }
@@ -1587,10 +1629,10 @@ export default function AntiqueScreen({ route, navigation }) {
                           />
                         )}
                         <Text style={styles.sheetRowText} numberOfLines={1}>
-                          {coll.collection_name || "Collection"}
+                          {coll.collection_name === SAVED_COLLECTION_NAME ? t("collection.savedName") : (coll.collection_name || "Collection")}
                         </Text>
                         <Text style={styles.sheetRowSubtext}>
-                          {ids.length} items
+                          {ids.length} {t("antique.itemsCount")}
                         </Text>
                       </Pressable>
                     );
@@ -1603,7 +1645,7 @@ export default function AntiqueScreen({ route, navigation }) {
                     <Text
                       style={[styles.sheetRowText, { color: colors.brand }]}
                     >
-                      Create new collection
+                      {t("antique.createNewCollection")}
                     </Text>
                   </Pressable>
                 </ScrollView>
@@ -1831,8 +1873,63 @@ function createStyles(colors) {
   ebayCardLoading: {
     alignItems: "center",
   },
-  ebaySectionTitle: {
+  ebayGridWrap: {
+    marginBottom: 20,
+  },
+  ebayGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 8,
+  },
+  ebayGridCard: {
+    backgroundColor: colors.bgWhite,
+    borderRadius: 12,
+    padding: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  ebayGridCardImageWrap: {
+    width: "100%",
+    height: 140,
+    borderTopEndRadius: 12,
+    borderTopStartRadius: 12,
+    overflow: "hidden",
+    backgroundColor: colors.border1,
+  },
+  ebayGridCardImage: {
+    width: "100%",
+    height: "100%",
+  },
+  ebayGridCardImagePlaceholder: {
+    backgroundColor: colors.border2,
+  },
+  ebayGridCardTitle: {
     fontSize: 16,
+    fontFamily: fonts.medium,
+    color: colors.textBase,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+  },
+  ebayGridCardBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    paddingHorizontal: 12,
+  },
+  ebayGridCardPrice: {
+    fontSize: 16,
+    fontFamily: fonts.semiBold,
+    color: colors.brand,
+    flex: 1,
+  },
+  ebaySectionTitle: {
+    fontSize: 20,
     fontFamily: fonts.semiBold,
     color: colors.textBase,
     marginBottom: 4,

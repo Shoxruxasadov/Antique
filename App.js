@@ -2,7 +2,7 @@ import 'react-native-gesture-handler';
 import { useEffect, useState, useRef } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -19,6 +19,8 @@ import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { mapSupabaseUserToStore } from './lib/authSync';
 import AppNavigator from './navigation/AppNavigator';
 import { configureRevenueCat } from './lib/revenueCat';
+import { initLocale, getLocale, setLocale, getLocaleFromSystem } from './lib/i18n';
+import { useLocaleStore } from './stores/useLocaleStore';
 
 // Top-level splash chaqiruvini olib tashlaymiz — ba'zi build'larda native crash sabab bo‘lishi mumkin
 try {
@@ -32,6 +34,7 @@ const SPLASH_MIN_MS = 2000;
 export default function App() {
   const [appReady, setAppReady] = useState(false);
   const [startupError, setStartupError] = useState(null);
+  const locale = useLocaleStore((s) => s.locale);
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
   const hasSeenOnboarding = useOnboardingStore((s) => s.hasSeenOnboarding);
   const hasSkippedGetStarted = useOnboardingStore((s) => s.hasSkippedGetStarted);
@@ -78,6 +81,8 @@ export default function App() {
           rehydrate(useExchangeRatesStore),
           rehydrate(useAssistantStore),
         ]);
+        await initLocale();
+        useLocaleStore.setState({ locale: getLocale() });
         if (cancelled) return;
         try {
           configureRevenueCat();
@@ -109,6 +114,21 @@ export default function App() {
       clearTimeout(timeoutId);
     };
   }, [fontsLoaded, fontError]);
+
+  // iOS: Settings dan til o‘zgargach ilova oldinga qaytganda app tilini tizim tiliga moslash
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+      const systemLocale = getLocaleFromSystem();
+      const current = getLocale();
+      if (systemLocale !== current) {
+        setLocale(systemLocale);
+        useLocaleStore.getState().setLocale(systemLocale);
+      }
+    });
+    return () => sub?.remove?.();
+  }, []);
 
   // Auth holat o‘zgarganda (login, logout, profile update) store ni sinxronlashtirish
   useEffect(() => {
@@ -154,7 +174,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer key={locale}>
         <AppNavigator completeOnboarding={completeOnboarding} initialRoute={initialRoute} />
       </NavigationContainer>
     </SafeAreaProvider>

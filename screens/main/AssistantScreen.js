@@ -20,12 +20,13 @@ import * as ImagePicker from "expo-image-picker";
 import { useColors, fonts } from "../../theme";
 import { useAssistantStore } from "../../stores/useAssistantStore";
 import { chatWithGemini } from "../../lib/gemini";
+import { t } from "../../lib/i18n";
 import { checkIsPro } from "../../lib/revenueCat";
 
-const SUGGESTIONS = [
-  "Affectable factors to antique item",
-  "Determine age of an antique",
-  "How to identify antique hallmarks",
+const SUGGESTION_KEYS = [
+  "assistant.suggestion1",
+  "assistant.suggestion2",
+  "assistant.suggestion3",
 ];
 
 function formatTime(iso) {
@@ -242,7 +243,11 @@ export default function AssistantScreen({ navigation }) {
           </View>
           <View style={styles.bubbleWrapLeft}>
             <View style={styles.bubbleLeft}>
-              <Text style={styles.bubbleText}>{stripMarkdown(item.text)}</Text>
+              <Text style={styles.bubbleText}>
+                {item.id === "welcome"
+                  ? t("assistant.welcomeMessage")
+                  : stripMarkdown(item.text)}
+              </Text>
               <Text style={styles.timeInBubble}>
                 {formatTime(item.timestamp)}
               </Text>
@@ -285,17 +290,20 @@ export default function AssistantScreen({ navigation }) {
     <>
       {showSuggestions && (
         <View style={styles.suggestionsWrap}>
-          {SUGGESTIONS.map((text, i) => (
-            <Pressable
-              key={i}
-              style={styles.quickReply}
-              onPress={() => onSuggestionPress(text)}
-            >
-              <Text style={styles.quickReplyText} numberOfLines={2}>
-                {text}
-              </Text>
-            </Pressable>
-          ))}
+          {SUGGESTION_KEYS.map((key, i) => {
+            const text = t(key);
+            return (
+              <Pressable
+                key={i}
+                style={styles.quickReply}
+                onPress={() => onSuggestionPress(text)}
+              >
+                <Text style={styles.quickReplyText} numberOfLines={2}>
+                  {text}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       )}
       {loading && (
@@ -322,7 +330,7 @@ export default function AssistantScreen({ navigation }) {
         <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
           <CaretLeft size={24} color={colors.textBase} weight="bold" />
         </Pressable>
-        <Text style={styles.headerTitle}>Ask Expert</Text>
+        <Text style={styles.headerTitle}>{t("assistant.title")}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -374,7 +382,7 @@ export default function AssistantScreen({ navigation }) {
             <View style={styles.inputBarInputWrap}>
               <TextInput
                 style={styles.captionInput}
-                placeholder="Add a caption (optional)"
+                placeholder={t("assistant.captionPlaceholder")}
                 placeholderTextColor={colors.textTertiary}
                 value={imageCaption}
                 onChangeText={setImageCaption}
@@ -400,7 +408,7 @@ export default function AssistantScreen({ navigation }) {
             <View style={styles.inputBarInputWrap}>
               <TextInput
                 style={styles.input}
-                placeholder="Ask anything"
+                placeholder={t("assistant.askPlaceholder")}
                 placeholderTextColor={colors.textTertiary}
                 value={input}
                 onChangeText={setInput}

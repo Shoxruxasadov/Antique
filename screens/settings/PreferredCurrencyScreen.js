@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft, MagnifyingGlass, Check } from 'phosphor-react-native';
 import { useColors, fonts } from '../../theme';
+import { t } from '../../lib/i18n';
 import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 
 const CURRENCIES = [
@@ -87,7 +88,7 @@ export default function PreferredCurrencyScreen({ navigation }) {
         >
           <CaretLeft size={24} color={colors.textBase} weight="bold" />
         </TouchableOpacity>
-        <Text style={styles.title}>Preferred Currency</Text>
+        <Text style={styles.title}>{t('settings.preferredCurrency')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -95,7 +96,7 @@ export default function PreferredCurrencyScreen({ navigation }) {
         <MagnifyingGlass size={20} color={colors.textTertiary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search currency"
+          placeholder={t('settings.searchCurrency')}
           placeholderTextColor={colors.textTertiary}
           value={search}
           onChangeText={setSearch}
@@ -104,7 +105,7 @@ export default function PreferredCurrencyScreen({ navigation }) {
         />
       </View>
 
-      <Text style={styles.sectionHeader}>Currencies</Text>
+      <Text style={styles.sectionHeader}>{t('settings.currencies')}</Text>
 
       <FlatList
         data={filtered}
