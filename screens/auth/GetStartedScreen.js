@@ -58,9 +58,9 @@ export default function GetStartedScreen({ navigation }) {
         btnDisabled: { opacity: 0.7 },
         btnApple: { flexDirection: 'row', width: '100%', backgroundColor: colors.bgInverted, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
         btnAppleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textInverse },
-        btnEmail: { flexDirection: 'row', width: '100%', backgroundColor: colors.border1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
+        btnEmail: { flexDirection: 'row', width: '100%', backgroundColor: colors.border1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 24 },
         btnEmailText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase },
-        btnGoogle: { flexDirection: 'row', width: '100%', backgroundColor: colors.border1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 24 },
+        btnGoogle: { flexDirection: 'row', width: '100%', backgroundColor: colors.border1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
         btnGoogleText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.textBase },
         footerRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' },
         footerLabel: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary },
@@ -103,13 +103,7 @@ export default function GetStartedScreen({ navigation }) {
           </Text>
         </Pressable>
 
-        <Pressable
-          style={styles.btnEmail}
-          onPress={() => navigation.navigate('SignUp')}
-        >
-          <Ionicons name="mail" size={ICON_SIZE} color={colors.textBase} />
-          <Text style={styles.btnEmailText}>{t('auth.continueWithEmail')}</Text>
-        </Pressable>
+      
 
         <Pressable
           style={[styles.btnGoogle, oauthLoading && styles.btnDisabled]}
@@ -124,6 +118,14 @@ export default function GetStartedScreen({ navigation }) {
           <Text style={styles.btnGoogleText}>
             {oauthLoading === 'google' ? t('auth.signingIn') : t('auth.continueWithGoogle')}
           </Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.btnEmail}
+          onPress={() => navigation.navigate('SignUp')}
+        >
+          <Ionicons name="mail" size={ICON_SIZE} color={colors.textBase} />
+          <Text style={styles.btnEmailText}>{t('auth.continueWithEmail')}</Text>
         </Pressable>
 
         <View style={styles.footerRow}>

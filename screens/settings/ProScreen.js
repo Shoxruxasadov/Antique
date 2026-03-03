@@ -9,6 +9,8 @@ import {
   Animated,
   Alert,
   ActivityIndicator,
+  BackHandler,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -74,6 +76,29 @@ export default function ProScreen({ navigation }) {
       ]).start(() => setShowClose(true));
     });
   }, []);
+
+  // 3 sekun davomida orqaga chiqishni bloklash: Android back, iOS swipe, boshqa usullar
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: showClose });
+  }, [navigation, showClose]);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (!showClose) return true;
+        return false;
+      });
+      return () => sub.remove();
+    }
+  }, [showClose]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (showClose) return;
+      e.preventDefault();
+    });
+    return unsubscribe;
+  }, [navigation, showClose]);
 
   const strokeDashoffset = progressAnim.interpolate({
     inputRange: [0, 1],

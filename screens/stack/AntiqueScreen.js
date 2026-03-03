@@ -31,7 +31,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   XCircle,
   CheckCircle,
+  Check,
   X,
+  Minus,
   DotsThreeOutlineIcon,
   CalendarBlank,
   Medal,
@@ -108,14 +110,47 @@ const CONDITION_BADGE_OPTIONS = {
   ],
 };
 
-function ConditionBadgeRow({ label, value, options, styles }) {
+const CONDITION_LABEL_KEYS = {
+  Excellent: "antique.conditionExcellent",
+  "Very Good": "antique.conditionVeryGood",
+  Good: "antique.conditionGood",
+  Fair: "antique.conditionFair",
+  Poor: "antique.conditionPoor",
+  Damaged: "antique.conditionDamaged",
+};
+
+const BADGE_VALUE_KEYS = {
+  Pristine: "antique.badgePristine",
+  "Minor Wear": "antique.badgeMinorWear",
+  "Moderate Wear": "antique.badgeModerateWear",
+  "Heavy Wear": "antique.badgeHeavyWear",
+  Damaged: "antique.badgeDamaged",
+  Intact: "antique.badgeIntact",
+  Stable: "antique.badgeStable",
+  "Minor Issues": "antique.badgeMinorIssues",
+  Compromised: "antique.badgeCompromised",
+  Broken: "antique.badgeBroken",
+  Minimal: "antique.badgeMinimal",
+  "Light Patina": "antique.badgeLightPatina",
+  "Moderate Aging": "antique.badgeModerateAging",
+  "Heavy Aging": "antique.badgeHeavyAging",
+  "Severe Deterioration": "antique.badgeSevereDeterioration",
+  Strong: "antique.badgeStrong",
+  Consistent: "antique.badgeConsistent",
+  Partial: "antique.badgePartial",
+  Weak: "antique.badgeWeak",
+  Inconclusive: "antique.badgeInconclusive",
+};
+
+function ConditionBadgeRow({ label, value, options, styles, translateBadge }) {
   if (!value || !options) return null;
   const normalized = String(value).trim();
   const index = options.findIndex(
     (opt) => opt.toLowerCase() === normalized.toLowerCase(),
   );
   const level = index >= 0 && index <= 4 ? index : -1;
-  const displayText = index >= 0 ? options[index] : value;
+  const rawText = index >= 0 ? options[index] : value;
+  const displayText = translateBadge ? translateBadge(rawText) : rawText;
   const badgeStyle =
     level >= 0
       ? [styles.conditionBadgeBase, styles[`conditionBadgeLevel${level}`]]
@@ -1079,6 +1114,10 @@ export default function AntiqueScreen({ route, navigation }) {
     if (lower.includes("damaged")) return "Damaged";
     return "Good";
   };
+  const translateConditionLabel = (label) =>
+    CONDITION_LABEL_KEYS[label] ? t(CONDITION_LABEL_KEYS[label]) : label;
+  const translateBadge = (v) =>
+    (v && BADGE_VALUE_KEYS[v] ? t(BADGE_VALUE_KEYS[v]) : v) || v;
 
   const getConditionStyle = (label, s) => {
     if (!s || s === "N/A") return "bad";
@@ -1424,29 +1463,40 @@ export default function AntiqueScreen({ route, navigation }) {
 
                 {/* Age and rarity section */}
                 <View style={styles.metricRow}>
-                  <View style={[styles.metricCard, { width: cardWidth }]}>
+                  <Pressable
+                    style={[styles.metricCard, { width: cardWidth }]}
+                    onPress={() => scrollToSection(0)}
+                  >
                     <CalendarBlank size={24} color={colors.brand} />
                     <Text style={styles.metricLabel}>{t("antique.age")}</Text>
                     <Text style={styles.metricValue}>{ageDisplay}</Text>
-                  </View>
-                  <View style={[styles.metricCard, { width: cardWidth }]}>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.metricCard, { width: cardWidth }]}
+                    onPress={() => scrollToSection(1)}
+                  >
                     <Medal size={24} color={colors.brand} />
                     <Text style={styles.metricLabel}>
                       {t("antique.rarity")}
                     </Text>
                     <Text style={styles.metricValue}>{rarityDisplay}</Text>
-                  </View>
-                  <View style={[styles.metricCard, { width: cardWidth }]}>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.metricCard, { width: cardWidth }]}
+                    onPress={() => scrollToSection(1)}
+                  >
                     <CheckCircle size={24} color={colors.brand} />
                     <Text style={styles.metricLabel}>
                       {t("antique.condition")}
                     </Text>
                     <Text style={styles.metricValue}>
-                      {normalizeConditionSummary(
-                        antique.overall_condition_summary,
+                      {translateConditionLabel(
+                        normalizeConditionSummary(
+                          antique.overall_condition_summary,
+                        ),
                       )}
                     </Text>
-                  </View>
+                  </Pressable>
                 </View>
 
                 {/* Market value section */}
@@ -1597,6 +1647,9 @@ export default function AntiqueScreen({ route, navigation }) {
                     reportSectionLayout(1, e.nativeEvent.layout.y)
                   }
                 >
+                  <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>
+                    {t("antique.tabCondition")}
+                  </Text>
                   <View style={styles.conditionGradeBlock}>
                     <View
                       style={[
@@ -1616,8 +1669,10 @@ export default function AntiqueScreen({ route, navigation }) {
                       </Text>
                     </View>
                     <Text style={styles.conditionOverallTitle}>
-                      {normalizeConditionSummary(
-                        antique.overall_condition_summary,
+                      {translateConditionLabel(
+                        normalizeConditionSummary(
+                          antique.overall_condition_summary,
+                        ),
                       )}
                     </Text>
                     <Text style={styles.conditionOverallSubtitle}>
@@ -1634,6 +1689,7 @@ export default function AntiqueScreen({ route, navigation }) {
                       }
                       options={CONDITION_BADGE_OPTIONS.surface_condition}
                       styles={styles}
+                      translateBadge={translateBadge}
                     />
                     <ConditionBadgeRow
                       label={t("antique.conditionStructuralIntegrity")}
@@ -1643,6 +1699,7 @@ export default function AntiqueScreen({ route, navigation }) {
                       }
                       options={CONDITION_BADGE_OPTIONS.structural_integrity}
                       styles={styles}
+                      translateBadge={translateBadge}
                     />
                     <ConditionBadgeRow
                       label={t("antique.conditionAgeWear")}
@@ -1651,6 +1708,7 @@ export default function AntiqueScreen({ route, navigation }) {
                       }
                       options={CONDITION_BADGE_OPTIONS.age_wear}
                       styles={styles}
+                      translateBadge={translateBadge}
                     />
                     <ConditionBadgeRow
                       label={t("antique.conditionAuthenticityMarkers")}
@@ -1660,6 +1718,7 @@ export default function AntiqueScreen({ route, navigation }) {
                       }
                       options={CONDITION_BADGE_OPTIONS.authenticity_markers}
                       styles={styles}
+                      translateBadge={translateBadge}
                     />
                   </View>
                 </View>
@@ -1825,43 +1884,43 @@ export default function AntiqueScreen({ route, navigation }) {
                       <Text style={styles.specLabel}>
                         {t("antique.authenticityMaterialMatch")}
                       </Text>
-                      <Text style={styles.specValue}>
-                        {antique.specification?.authenticity_material_match ===
-                        true
-                          ? "✓"
-                          : antique.specification
-                                ?.authenticity_material_match === false
-                            ? "✗"
-                            : "—"}
-                      </Text>
+                      <View style={[styles.specValue, { alignSelf: "flex-end" }]}>
+                        {antique.specification?.authenticity_material_match === true ? (
+                          <Check size={20} color={colors.green} weight="bold" />
+                        ) : antique.specification?.authenticity_material_match === false ? (
+                          <X size={20} color={colors.textSecondary} weight="bold" />
+                        ) : (
+                          <Minus size={20} color={colors.textSecondary} weight="bold" />
+                        )}
+                      </View>
                     </View>
                     <View style={styles.specRow}>
                       <Text style={styles.specLabel}>
                         {t("antique.authenticityStyleMatch")}
                       </Text>
-                      <Text style={styles.specValue}>
-                        {antique.specification?.authenticity_style_match ===
-                        true
-                          ? "✓"
-                          : antique.specification?.authenticity_style_match ===
-                              false
-                            ? "✗"
-                            : "—"}
-                      </Text>
+                      <View style={[styles.specValue, { alignSelf: "flex-end" }]}>
+                        {antique.specification?.authenticity_style_match === true ? (
+                          <Check size={20} color={colors.green} weight="bold" />
+                        ) : antique.specification?.authenticity_style_match === false ? (
+                          <X size={20} color={colors.textSecondary} weight="bold" />
+                        ) : (
+                          <Minus size={20} color={colors.textSecondary} weight="bold" />
+                        )}
+                      </View>
                     </View>
                     <View style={[styles.specRow, { borderBottomWidth: 0 }]}>
                       <Text style={styles.specLabel}>
                         {t("antique.authenticityWearPattern")}
                       </Text>
-                      <Text style={styles.specValue}>
-                        {antique.specification?.authenticity_wear_pattern ===
-                        true
-                          ? "✓"
-                          : antique.specification?.authenticity_wear_pattern ===
-                              false
-                            ? "✗"
-                            : "—"}
-                      </Text>
+                      <View style={[styles.specValue, { alignSelf: "flex-end" }]}>
+                        {antique.specification?.authenticity_wear_pattern === true ? (
+                          <Check size={20} color={colors.green} weight="bold" />
+                        ) : antique.specification?.authenticity_wear_pattern === false ? (
+                          <X size={20} color={colors.textSecondary} weight="bold" />
+                        ) : (
+                          <Minus size={20} color={colors.textSecondary} weight="bold" />
+                        )}
+                      </View>
                     </View>
                   </View>
                   {(

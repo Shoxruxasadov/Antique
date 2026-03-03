@@ -1,6 +1,6 @@
 {
   "name": "AntiqPro",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "bundleIdentifier": "com.webnum.antique",
   "main": "index.js",
   "scripts": {
@@ -38,6 +38,7 @@
     "@supabase/supabase-js": "^2.97.0",
     "babel-preset-expo": "~54.0.10",
     "expo": "~54.0.33",
+    "expo-apple-authentication": "~8.0.8",
     "expo-auth-session": "~7.0.10",
     "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",
