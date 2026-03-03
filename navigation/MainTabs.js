@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, View } from 'react-native';
-import { SquaresFour, FolderSimpleIcon, User } from 'phosphor-react-native';
+import { HouseIcon, FolderSimpleIcon, User } from 'phosphor-react-native';
 import HomeScreen, { setHomeAnimateOnNextFocus } from '../screens/main/HomeScreen';
 import CollectionScreen from '../screens/main/CollectionScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
@@ -47,7 +47,7 @@ export default function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <SquaresFour size={TAB_ICON_SIZE} color={color} weight='fill'  />
+            <HouseIcon size={TAB_ICON_SIZE} color={color} weight='fill'  />
           ),
           tabBarLabel: t('tabs.home'),
           listeners: () => ({
