@@ -31,6 +31,7 @@ import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
 import { useLocalCollectionStore, SAVED_COLLECTION_NAME, LOCAL_SAVED_ID } from '../../stores/useLocalCollectionStore';
 import { syncLocalCollectionToSupabase } from '../../lib/syncLocalCollection';
 import { formatPriceUsd, getDisplayMarketValueUsd } from '../../lib/currency';
+import { normalizeCategoryDisplay } from '../../lib/antiqueDisplay';
 import { t } from '../../lib/i18n';
 
 const THUMB_GAP = 7;
@@ -282,23 +283,32 @@ export default function CollectionScreen({ navigation, route }) {
         return String(b.id ?? '').localeCompare(String(a.id ?? ''));
       });
       setCollections(collList);
-      setSnapHistory(snapList);
 
       const allIds = [...new Set(collList.flatMap((c) => c.antiques_ids || []).filter(Boolean))];
-      if (allIds.length > 0) {
+      const snapAntiqueIds = [...new Set(snapList.map((s) => s.antique_id).filter(Boolean))];
+      const combinedIds = [...new Set([...allIds, ...snapAntiqueIds])];
+      if (combinedIds.length > 0) {
         const { data: antiques, error: antErr } = await supabase
           .from('antiques')
-          .select('id, image_url')
-          .in('id', allIds);
+          .select('id, name, category, market_value_min, market_value_max, image_url, specification')
+          .in('id', combinedIds);
         if (antErr) console.warn('Antiques fetch error:', antErr.message);
         const map = {};
+        const antiqueById = {};
         (antiques || []).forEach((row) => {
           const url = Array.isArray(row.image_url) ? row.image_url?.[0] : row.image_url;
           map[row.id] = url || null;
+          antiqueById[row.id] = row;
         });
         setAntiqueImageMap(map);
+        const mergedSnapList = snapList.map((snap) => ({
+          ...snap,
+          antique: snap.antique_id ? antiqueById[snap.antique_id] ?? null : null,
+        }));
+        setSnapHistory(mergedSnapList);
       } else {
         setAntiqueImageMap({});
+        setSnapHistory(snapList);
       }
     } catch (e) {
       console.warn('Fetch error:', e?.message || e);
@@ -726,10 +736,11 @@ t('home.removeFromHistoryTitle'),
               </Animated.View>
             ) : (
               snapHistory.map((snap, idx) => {
-                const category = Array.isArray(snap.payload?.category)
-                  ? snap.payload.category.join(', ')
-                  : (snap.payload?.category || 'Antique');
-                const displayValueObj = {
+                const antique = snap.antique;
+                const category = antique
+                  ? normalizeCategoryDisplay(antique.name, antique.specification?.category ?? antique.category ?? snap.payload?.category)
+                  : normalizeCategoryDisplay(snap.payload?.name, snap.payload?.category || 'Antique');
+                const valueSource = antique ?? {
                   market_value_min: snap.payload?.market_value_min,
                   market_value_max: snap.payload?.market_value_max,
                   specification: {
@@ -737,7 +748,7 @@ t('home.removeFromHistoryTitle'),
                     ebay_items: snap.antique?.specification?.ebay_items,
                   },
                 };
-                const currentValue = getDisplayMarketValueUsd(displayValueObj);
+                const currentValue = getDisplayMarketValueUsd(valueSource);
                 const priceStr = currentValue > 0 ? formatPriceUsd(currentValue, displayCurrency, rate) : '';
                 const animIdx = Math.min(idx, HISTORY_CARD_ANIM_COUNT - 1);
                 const anim = historyCardAnims[animIdx];

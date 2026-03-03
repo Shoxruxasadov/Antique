@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   StyleSheet,
   View,
@@ -49,6 +55,7 @@ import {
   formatPrice as formatPriceWithCurrency,
   formatPriceRangeUsd,
   formatPriceUsd,
+  getDisplayMarketValueUsd,
 } from "../../lib/currency";
 import { requestAppReview } from "../../lib/requestAppReview";
 import {
@@ -56,9 +63,78 @@ import {
   buildEbaySearchQueryFromAntique,
 } from "../../lib/ebay";
 import { t } from "../../lib/i18n";
+import { normalizeCategoryDisplay } from "../../lib/antiqueDisplay";
 import { SAVED_COLLECTION_NAME } from "../../stores/useLocalCollectionStore";
+import { checkIsPro } from "../../lib/revenueCat";
 
-const TAB_NAMES = ["details", "condition", "history"];
+const TAB_NAMES = [
+  "details",
+  "condition",
+  "provenance",
+  "authenticity",
+  "careTips",
+  "ebay",
+  "expert",
+];
+
+const CONDITION_BADGE_OPTIONS = {
+  surface_condition: [
+    "Pristine",
+    "Minor Wear",
+    "Moderate Wear",
+    "Heavy Wear",
+    "Damaged",
+  ],
+  structural_integrity: [
+    "Intact",
+    "Stable",
+    "Minor Issues",
+    "Compromised",
+    "Broken",
+  ],
+  age_wear: [
+    "Minimal",
+    "Light Patina",
+    "Moderate Aging",
+    "Heavy Aging",
+    "Severe Deterioration",
+  ],
+  authenticity_markers: [
+    "Strong",
+    "Consistent",
+    "Partial",
+    "Weak",
+    "Inconclusive",
+  ],
+};
+
+function ConditionBadgeRow({ label, value, options, styles }) {
+  if (!value || !options) return null;
+  const normalized = String(value).trim();
+  const index = options.findIndex(
+    (opt) => opt.toLowerCase() === normalized.toLowerCase(),
+  );
+  const level = index >= 0 && index <= 4 ? index : -1;
+  const displayText = index >= 0 ? options[index] : value;
+  const badgeStyle =
+    level >= 0
+      ? [styles.conditionBadgeBase, styles[`conditionBadgeLevel${level}`]]
+      : styles.conditionBadgeBase;
+  const textStyle =
+    level >= 0
+      ? [styles.conditionBadgeText, styles[`conditionBadgeTextLevel${level}`]]
+      : styles.conditionBadgeText;
+  return (
+    <View style={styles.conditionBadgeRow}>
+      <Text style={styles.conditionBadgeRowLabel}>{label}</Text>
+      <View style={badgeStyle}>
+        <Text style={textStyle} numberOfLines={1}>
+          {displayText}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 function ConditionRow({ label, status, statusStyle, note, styles, colors }) {
   const isBad = statusStyle === "bad";
@@ -75,13 +151,6 @@ function ConditionRow({ label, status, statusStyle, note, styles, colors }) {
       : null;
   return (
     <View style={styles.conditionRow}>
-      <View style={[styles.conditionRowIcon, iconBgStyle]}>
-        {isBad ? (
-          <XCircle size={18} color={iconColor} />
-        ) : (
-          <CheckCircle size={18} color={iconColor} />
-        )}
-      </View>
       <View style={styles.conditionRowBody}>
         <View style={styles.conditionRowHeader}>
           <Text style={styles.conditionRowLabel}>{label}</Text>
@@ -111,7 +180,15 @@ function ConditionRow({ label, status, statusStyle, note, styles, colors }) {
   );
 }
 
-function TimelineItem({ Icon, title, subtitle, isFirst, isLast, styles, colors }) {
+function TimelineItem({
+  Icon,
+  title,
+  subtitle,
+  isFirst,
+  isLast,
+  styles,
+  colors,
+}) {
   return (
     <View style={styles.timelineItem}>
       <View style={styles.timelineLeft}>
@@ -162,7 +239,15 @@ export default function AntiqueScreen({ route, navigation }) {
   const rate = displayCurrency === "USD" ? 1 : (rates?.[displayCurrency] ?? 1);
   const [antique, setAntique] = useState(antiqueParam || null);
   const [loading, setLoading] = useState(!antiqueParam && !!antiqueId);
-  const [activeTab, setActiveTab] = useState("details");
+  const [activeSectionIndex, setActiveSectionIndex] = useState(0);
+  const [sectionTops, setSectionTops] = useState([
+    0, 500, 1000, 1500, 2000, 2500, 3000,
+  ]);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const [bouncesEnabled, setBouncesEnabled] = useState(false);
+  const bouncesThresholdRef = useRef(false);
+  const [buttonRowY, setButtonRowY] = useState(0);
+  const buttonRowYRef = useRef(0);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [collections, setCollections] = useState([]);
   const [loadingCollections, setLoadingCollections] = useState(false);
@@ -172,6 +257,7 @@ export default function AntiqueScreen({ route, navigation }) {
   const [ebayLinks, setEbayLinks] = useState([]);
   const [loadingEbay, setLoadingEbay] = useState(false);
   const [showOptionsSheet, setShowOptionsSheet] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   const sheetOverlayOpacity = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(
     new Animated.Value(Dimensions.get("window").height),
@@ -189,6 +275,10 @@ export default function AntiqueScreen({ route, navigation }) {
   const isExpandedRef = useRef(false);
   const scrollRef = useRef(null);
   const contentScrollYRef = useRef(0);
+  const stickySectionScrollRef = useRef(null);
+  const inFlowSectionScrollRef = useRef(null);
+  const scrollingToSectionIndexRef = useRef(null);
+  const SECTION_BUTTON_SLOT_WIDTH = 96;
 
   const closeBtnImageOpacity = sheetY.interpolate({
     inputRange: [EXPANDED_Y, COLLAPSED_Y],
@@ -230,16 +320,6 @@ export default function AntiqueScreen({ route, navigation }) {
     outputRange: [8, 0],
   });
 
-  const tabIndicatorLeft = useRef(
-    new Animated.Value(
-      (() => {
-        const w = Dimensions.get("window").width;
-        return ((w - 32 - 8) / 3) * 1; // condition = index 1
-      })(),
-    ),
-  ).current;
-  const tabContentOpacity = useRef(new Animated.Value(1)).current;
-  const tabContentTranslateY = useRef(new Animated.Value(0)).current;
   const isInCurrentCollection =
     Array.isArray(fromCollectionAntiquesIds) &&
     antique?.id != null &&
@@ -261,6 +341,7 @@ export default function AntiqueScreen({ route, navigation }) {
         .eq("id", antiqueId)
         .single();
       if (!error) setAntique(data);
+      else setAntique(null);
       setLoading(false);
     })();
   }, [antiqueId, antiqueParam]);
@@ -290,7 +371,7 @@ export default function AntiqueScreen({ route, navigation }) {
 
   // eBay: agar specification da ebay ma’lumoti yo‘q bo‘lsa, antique nomi bo‘yicha qidiruv
   useEffect(() => {
-    if (!antique) return;
+    if (!antique || !isPro) return;
     const spec = antique.specification ?? {};
     const hasStored =
       (Array.isArray(spec.ebay_links) && spec.ebay_links.length > 0) ||
@@ -316,7 +397,7 @@ export default function AntiqueScreen({ route, navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [antique?.id, antique?.name, antique?.specification]);
+  }, [antique?.id, antique?.name, antique?.specification, isPro]);
 
   const displayEbayLinks =
     antique?.specification?.ebay_links?.length > 0
@@ -341,7 +422,7 @@ export default function AntiqueScreen({ route, navigation }) {
     const avg =
       withNum.reduce((s, it) => s + it.priceNum, 0) / withNum.length || 0;
     const sorted = [...withNum].sort(
-      (a, b) => Math.abs(a.priceNum - avg) - Math.abs(b.priceNum - avg)
+      (a, b) => Math.abs(a.priceNum - avg) - Math.abs(b.priceNum - avg),
     );
     return sorted.slice(0, 4);
   }, [displayEbayItems]);
@@ -353,60 +434,75 @@ export default function AntiqueScreen({ route, navigation }) {
     }
   }, []);
 
-  const tabIndex = TAB_NAMES.indexOf(activeTab);
-  const tabBarPadding = 4;
-  const tabBarContentWidth = width - 32 - tabBarPadding * 2;
-  const tabWidth = tabBarContentWidth / 3;
-  const indicatorTranslateX = tabIndex * tabWidth;
+  const getTabLabel = (tab) => {
+    const labels = {
+      details: "antique.tabDetails",
+      condition: "antique.tabCondition",
+      provenance: "antique.tabProvenance",
+      authenticity: "antique.tabAuthenticity",
+      careTips: "antique.tabCareTips",
+      ebay: "antique.tabEbay",
+      expert: "antique.tabExpert",
+    };
+    return t(labels[tab] || tab);
+  };
+
+  const scrollToSection = (index) => {
+    scrollingToSectionIndexRef.current = index;
+    setActiveSectionIndex(index);
+    const sectionY = sectionTops[index] ?? 0;
+    const y = Math.max(0, sectionY - SCROLL_SECTION_OFFSET);
+    scrollRef.current?.scrollTo({ y, animated: true });
+  };
+
+  const handleScrollSection = (e) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const threshold = 80;
+    const scrollingTo = scrollingToSectionIndexRef.current;
+    if (scrollingTo !== null) {
+      const targetY = sectionTops[scrollingTo] ?? 0;
+      if (y >= targetY - threshold) {
+        scrollingToSectionIndexRef.current = null;
+      }
+      return;
+    }
+    let next = 0;
+    if (sectionTops[6] > 0 && y >= sectionTops[6] - threshold) next = 6;
+    else if (sectionTops[5] > 0 && y >= sectionTops[5] - threshold) next = 5;
+    else if (sectionTops[4] > 0 && y >= sectionTops[4] - threshold) next = 4;
+    else if (sectionTops[3] > 0 && y >= sectionTops[3] - threshold) next = 3;
+    else if (sectionTops[2] > 0 && y >= sectionTops[2] - threshold) next = 2;
+    else if (sectionTops[1] > 0 && y >= sectionTops[1] - threshold) next = 1;
+    else next = 0;
+    setActiveSectionIndex((prev) => (prev !== next ? next : prev));
+  };
+
+  const reportSectionLayout = (index, y) => {
+    setSectionTops((prev) => {
+      const next = [...prev];
+      next[index] = y;
+      return next;
+    });
+  };
 
   useEffect(() => {
-    Animated.timing(tabIndicatorLeft, {
-      toValue: indicatorTranslateX,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [activeTab, indicatorTranslateX]);
+    buttonRowYRef.current = buttonRowY;
+  }, [buttonRowY]);
 
-  const handleTabPress = (tab) => {
-    if (tab === activeTab) return;
-    const runTabSwitch = () => {
-      Animated.parallel([
-        Animated.timing(tabContentOpacity, {
-          toValue: 0,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-        Animated.timing(tabContentTranslateY, {
-          toValue: 8,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setActiveTab(tab);
-        tabContentTranslateY.setValue(-8);
-        Animated.parallel([
-          Animated.timing(tabContentOpacity, {
-            toValue: 1,
-            duration: 200,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(tabContentTranslateY, {
-            toValue: 0,
-            duration: 200,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]).start();
-      });
-    };
-    if (!isExpandedRef.current) {
-      doExpand(runTabSwitch);
-    } else {
-      runTabSwitch();
-    }
-  };
+  useEffect(() => {
+    const x = Math.max(0, activeSectionIndex * SECTION_BUTTON_SLOT_WIDTH - 60);
+    stickySectionScrollRef.current?.scrollTo({ x, animated: true });
+    inFlowSectionScrollRef.current?.scrollTo({ x, animated: true });
+  }, [activeSectionIndex]);
+
+  useEffect(() => {
+    if (!showStickyBar) return;
+    const x = Math.max(0, activeSectionIndex * SECTION_BUTTON_SLOT_WIDTH - 60);
+    const t = setTimeout(() => {
+      stickySectionScrollRef.current?.scrollTo({ x, animated: true });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [showStickyBar, activeSectionIndex]);
 
   useEffect(() => {
     if (!showAddSheet || !user?.id || !supabase) return;
@@ -426,6 +522,7 @@ export default function AntiqueScreen({ route, navigation }) {
       }),
     ]).start();
     setLoadingCollections(true);
+    checkIsPro().then(setIsPro);
     (async () => {
       try {
         const { data } = await supabase
@@ -605,8 +702,24 @@ export default function AntiqueScreen({ route, navigation }) {
     [doCollapse],
   );
 
+  const STICKY_BAR_PRELOAD_OFFSET = 5;
+  const SCROLL_SECTION_OFFSET = 60;
+
+  const BOUNCES_THRESHOLD = 200;
+
   const handleContentScroll = useCallback((e) => {
-    contentScrollYRef.current = e.nativeEvent.contentOffset.y;
+    const y = e.nativeEvent.contentOffset.y;
+    contentScrollYRef.current = y;
+    const threshold = buttonRowYRef.current - STICKY_BAR_PRELOAD_OFFSET;
+    setShowStickyBar((prev) => {
+      const next = y >= threshold;
+      return next !== prev ? next : prev;
+    });
+    const shouldBounce = y > BOUNCES_THRESHOLD;
+    if (bouncesThresholdRef.current !== shouldBounce) {
+      bouncesThresholdRef.current = shouldBounce;
+      setBouncesEnabled(shouldBounce);
+    }
   }, []);
 
   const showChangeCollection =
@@ -701,30 +814,29 @@ export default function AntiqueScreen({ route, navigation }) {
       );
       return;
     }
-    Alert.alert(
-      t("antique.deleteItemTitle"),
-      t("antique.deleteItemMessage"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("common.delete"),
-          style: "destructive",
-          onPress: async () => {
-            if (!antique?.id || !supabase) return;
-            try {
-              const { error } = await supabase
-                .from("antiques")
-                .delete()
-                .eq("id", antique.id);
-              if (error) throw error;
-              navigation.goBack();
-            } catch (e) {
-              Alert.alert(t("common.error"), e?.message || t("antique.deleteItemMessage"));
-            }
-          },
+    Alert.alert(t("antique.deleteItemTitle"), t("antique.deleteItemMessage"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: async () => {
+          if (!antique?.id || !supabase) return;
+          try {
+            const { error } = await supabase
+              .from("antiques")
+              .delete()
+              .eq("id", antique.id);
+            if (error) throw error;
+            navigation.goBack();
+          } catch (e) {
+            Alert.alert(
+              t("common.error"),
+              e?.message || t("antique.deleteItemMessage"),
+            );
+          }
         },
-      ],
-    );
+      },
+    ]);
   }, [
     closeOptionsSheet,
     fromHistory,
@@ -758,9 +870,15 @@ export default function AntiqueScreen({ route, navigation }) {
         if (error) throw error;
         await refreshCollectionStatus();
         closeAddSheet();
-        Alert.alert(t("antique.addedTitle"), t("antique.addedToCollectionMessage"));
+        Alert.alert(
+          t("antique.addedTitle"),
+          t("antique.addedToCollectionMessage"),
+        );
       } catch (e) {
-        Alert.alert(t("common.error"), e?.message || t("antique.addedToCollectionMessage"));
+        Alert.alert(
+          t("common.error"),
+          e?.message || t("antique.addedToCollectionMessage"),
+        );
       }
     },
     [antique?.id, supabase, closeAddSheet, refreshCollectionStatus],
@@ -768,6 +886,11 @@ export default function AntiqueScreen({ route, navigation }) {
 
   const handleCreateNewCollection = useCallback(async () => {
     if (!user?.id || !antique?.id || !supabase) return;
+    if (!isPro) {
+      closeAddSheet();
+      navigation.navigate("Pro", { fromAntique: true });
+      return;
+    }
     try {
       const now = new Date().toISOString();
       const { error } = await supabase.from("collections").insert({
@@ -780,18 +903,32 @@ export default function AntiqueScreen({ route, navigation }) {
       if (error) throw error;
       await refreshCollectionStatus();
       closeAddSheet();
-      Alert.alert(t("antique.addedTitle"), t("antique.newCollectionCreatedMessage"));
+      Alert.alert(
+        t("antique.addedTitle"),
+        t("antique.newCollectionCreatedMessage"),
+      );
     } catch (e) {
-      Alert.alert(t("common.error"), e?.message || t("antique.newCollectionCreatedMessage"));
+      Alert.alert(
+        t("common.error"),
+        e?.message || t("antique.newCollectionCreatedMessage"),
+      );
     }
-  }, [user?.id, antique?.id, supabase, closeAddSheet, refreshCollectionStatus]);
+  }, [
+    user?.id,
+    antique?.id,
+    supabase,
+    closeAddSheet,
+    refreshCollectionStatus,
+    isPro,
+    navigation,
+  ]);
 
   if (loading) {
     return (
       <View
         style={[styles.container, styles.center, { paddingTop: insets.top }]}
       >
-        <StatusBar style={colors.isDark ? 'light' : 'dark'} />
+        <StatusBar style={colors.isDark ? "light" : "dark"} />
         <ActivityIndicator size="large" color={colors.brand} />
       </View>
     );
@@ -802,7 +939,7 @@ export default function AntiqueScreen({ route, navigation }) {
       <View
         style={[styles.container, styles.center, { paddingTop: insets.top }]}
       >
-        <StatusBar style={colors.isDark ? 'light' : 'dark'} />
+        <StatusBar style={colors.isDark ? "light" : "dark"} />
         <Text style={styles.emptyText}>{t("antique.itemNotFound")}</Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -819,10 +956,130 @@ export default function AntiqueScreen({ route, navigation }) {
   const ageYrs = antique.estimated_age_years ?? 0;
   const rarityScore = antique.rarity_score ?? 0;
   const rarityMax = antique.rarity_max_score ?? 10;
+  const spec = antique.specification ?? {};
+  // Fallbacks so we don't show "0 yrs", "0/10", "Unknown · 0 – 0 yrs" when data is in specification only
+  const hasPeriodYears =
+    (antique.period_start_year != null && antique.period_start_year !== 0) ||
+    (antique.period_end_year != null && antique.period_end_year !== 0);
+  const originLineText = hasPeriodYears
+    ? `${antique.origin_country ?? spec.origin ?? "Unknown"} · ${antique.period_start_year ?? "?"} – ${antique.period_end_year ?? "?"} ${t("antique.yrs")}`
+    : `${antique.origin_country ?? spec.origin ?? "Unknown"} · ${spec.period || "—"}`;
+  // Age card: number "120" or range "200-230" (from estimated_age_display e.g. "c. 200-230 years")
+  const ageDisplay = (() => {
+    if (ageYrs > 0) return `${ageYrs} ${t("antique.yrs")}`;
+    const raw = spec.estimated_age_display;
+    if (!raw || typeof raw !== "string") return "—";
+    const s = raw.trim();
+    const rangeMatch = s.match(/(\d+)\s*[-–]\s*(\d+)/);
+    if (rangeMatch) return `${rangeMatch[1]}-${rangeMatch[2]}`;
+    const singleMatch = s.match(/(\d+)/);
+    if (singleMatch) return `${singleMatch[1]} ${t("antique.yrs")}`;
+    return s || "—";
+  })();
+  // Rarity card: always "X/10". If only label (e.g. "Rare"), map to score.
+  const RARITY_LABEL_TO_SCORE = {
+    common: 2,
+    uncommon: 4,
+    rare: 7,
+    "very rare": 8,
+    "extremely rare": 9,
+  };
+  const rarityDisplay = (() => {
+    if (rarityScore > 0) return `${rarityScore} / ${rarityMax}`;
+    const label = (spec.rarity_label || "").trim().toLowerCase();
+    const mapped = label ? RARITY_LABEL_TO_SCORE[label] : null;
+    if (mapped != null) return `${mapped} / ${rarityMax}`;
+    return "—";
+  })();
+  const rarityScoreForColor =
+    rarityScore > 0
+      ? rarityScore
+      : (() => {
+          const label = (spec.rarity_label || "").trim().toLowerCase();
+          return label ? RARITY_LABEL_TO_SCORE[label] ?? 0 : 0;
+        })();
+  const getRarityCircleColors = (score) => {
+    const isDark = colors.isDark;
+    if (score >= 9) {
+      return isDark
+        ? { bg: "rgba(74, 222, 128, 0.2)", text: "#86efac" }
+        : { bg: "rgba(34, 197, 94, 0.22)", text: "#15803d" };
+    }
+    if (score >= 7) {
+      return isDark
+        ? { bg: "rgba(250, 204, 21, 0.18)", text: "#fde047" }
+        : { bg: "rgba(234, 179, 8, 0.28)", text: "#854d0e" };
+    }
+    if (score >= 5) {
+      return isDark
+        ? { bg: "rgba(251, 146, 60, 0.2)", text: "#fdba74" }
+        : { bg: "rgba(249, 115, 22, 0.22)", text: "#c2410c" };
+    }
+    if (score >= 3) {
+      return isDark
+        ? { bg: "rgba(248, 113, 113, 0.2)", text: "#fca5a5" }
+        : { bg: "rgba(239, 68, 68, 0.22)", text: "#b91c1c" };
+    }
+    if (score >= 1) {
+      return isDark
+        ? { bg: "rgba(225, 29, 72, 0.18)", text: "#fb7185" }
+        : { bg: "rgba(185, 28, 28, 0.2)", text: "#7f1d1d" };
+    }
+    return { bg: colors.border2, text: colors.textSecondary };
+  };
+  const rarityCircleColors = getRarityCircleColors(rarityScoreForColor);
+  const descriptionText =
+    antique.description?.trim() ||
+    (() => {
+      const period =
+        spec.period ||
+        (antique.period_start_year != null && antique.period_end_year != null
+          ? `${antique.period_start_year}–${antique.period_end_year}`
+          : null);
+      const origin = spec.origin || antique.origin_country;
+      const material = spec.material;
+      const dimensions = spec.dimensions;
+      const maker = spec.maker;
+      const sentences = [];
+      if (period)
+        sentences.push(`This item is attributed to the ${period} period.`);
+      if (origin) sentences.push(`It likely originates from ${origin}.`);
+      if (material) sentences.push(`The material is ${material}.`);
+      if (dimensions) sentences.push(dimensions);
+      if (maker && maker !== "Unknown")
+        sentences.push(`Maker or workshop: ${maker}.`);
+      return sentences.length ? sentences.join(" ") : null;
+    })() ||
+    t("antique.noDescription");
   const growthPct =
     antique.avg_growth_percentage != null
       ? (antique.avg_growth_percentage * 100).toFixed(0)
       : "0";
+  const CONDITION_LABELS = [
+    "Excellent",
+    "Very Good",
+    "Good",
+    "Fair",
+    "Poor",
+    "Damaged",
+  ];
+  const normalizeConditionSummary = (raw) => {
+    if (!raw || typeof raw !== "string") return "Good";
+    const trimmed = raw.replace(/^Overall Condition:\s*/i, "").trim();
+    const lower = trimmed.toLowerCase();
+    const found = CONDITION_LABELS.find(
+      (l) => l.toLowerCase() === lower || lower.includes(l.toLowerCase()),
+    );
+    if (found) return found;
+    if (lower.includes("excellent")) return "Excellent";
+    if (lower.includes("very good")) return "Very Good";
+    if (lower.includes("good")) return "Good";
+    if (lower.includes("fair")) return "Fair";
+    if (lower.includes("poor")) return "Poor";
+    if (lower.includes("damaged")) return "Damaged";
+    return "Good";
+  };
+
   const getConditionStyle = (label, s) => {
     if (!s || s === "N/A") return "bad";
     const lower = s.toLowerCase();
@@ -831,71 +1088,91 @@ export default function AntiqueScreen({ route, navigation }) {
     return "bad"; // fair, poor, etc.
   };
 
-  const SPEC_LABEL_KEYS = {
-    case_material: "antique.specCaseMaterial",
-    glass_type: "antique.specGlassType",
-    construction: "antique.specConstruction",
-    era: "antique.specEra",
-    style: "antique.specStyle",
-    dimensions: "antique.specDimensions",
-    origin: "antique.specOrigin",
+  const getDetailsSpecRows = (a) => {
+    const spec = a?.specification ?? {};
+    const rawCategory =
+      spec.category ??
+      (Array.isArray(a?.category) ? a.category[0] : a?.category);
+    const category = normalizeCategoryDisplay(a?.name, rawCategory);
+    const period =
+      spec.period ??
+      (a?.period_start_year != null && a?.period_end_year != null
+        ? `${a.period_start_year} – ${a.period_end_year}`
+        : null);
+    const origin = spec.origin ?? a?.origin_country;
+    const estimatedAge =
+      spec.estimated_age_display ??
+      (a?.estimated_age_years != null
+        ? `~${a.estimated_age_years} years`
+        : null);
+    return [
+      { labelKey: "antique.specCategory", value: category },
+      { labelKey: "antique.specPeriod", value: period },
+      { labelKey: "antique.specOrigin", value: origin },
+      { labelKey: "antique.specMaker", value: spec.maker },
+      { labelKey: "antique.specMaterial", value: spec.material },
+      { labelKey: "antique.specDimensions", value: spec.dimensions },
+      { labelKey: "antique.specEstimatedAge", value: estimatedAge },
+    ];
   };
-  const getSpecificationRows = (a) => {
-    const spec = a?.specification;
-    const isEmpty =
-      !spec ||
-      (typeof spec === "object" &&
-        !Array.isArray(spec) &&
-        Object.keys(spec).length === 0);
-    if (isEmpty) {
-      const rows = [
-        {
-          key: "antique.specCaseMaterial",
-          value:
-            (Array.isArray(a?.category) ? a.category[0] : a?.category) || null,
-        },
-        {
-          key: "antique.specEra",
-          value: [a?.period_start_year, a?.period_end_year].filter(Boolean)
-            .length
-            ? `${a.period_start_year} – ${a.period_end_year}`
-            : null,
-        },
-        { key: "antique.specOrigin", value: a?.origin_country || null },
-      ].filter((r) => r.value);
-      return rows.length ? rows : [{ key: "antique.noSpecification", value: null }];
-    }
-    if (Array.isArray(spec))
-      return spec.map(({ key, value }) => ({
-        key: key || "—",
-        value: value ?? "—",
-      }));
-    return Object.entries(spec)
-      .filter(
-        ([k]) =>
-          k !== "ebay_links" &&
-          k !== "ebay_items" &&
-          k !== "estimated_market_value_usd" &&
-          k !== "estimated_market_value_low_usd" &&
-          k !== "estimated_market_value_high_usd",
-      )
-      .map(([k, v]) => ({
-        key:
-          SPEC_LABEL_KEYS[k] ||
-          k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        value: v ?? "—",
-      }));
+
+  const getValueInsightRows = (a) => {
+    const spec = a?.specification ?? {};
+    const rarity =
+      spec.rarity_label ??
+      (() => {
+        const score = a?.rarity_score ?? 0;
+        if (score <= 2) return "Common";
+        if (score <= 4) return "Uncommon";
+        if (score <= 6) return "Rare";
+        if (score <= 8) return "Very Rare";
+        return "Extremely Rare";
+      })();
+    return [
+      { labelKey: "antique.valueRarity", value: rarity },
+      { labelKey: "antique.valueMarketDemand", value: spec.market_demand },
+    ];
   };
 
   const buildOriginProvenanceFallback = (a) => {
-    const place = a?.origin_country || "Unknown";
-    const period = [a?.period_start_year, a?.period_end_year].filter(Boolean)
-      .length
+    const s = a?.specification ?? {};
+    const place = a?.origin_country || s.origin || "Unknown";
+    const region = s.region_of_origin || place;
+    const hasYears =
+      (a?.period_start_year != null && a?.period_start_year !== 0) ||
+      (a?.period_end_year != null && a?.period_end_year !== 0);
+    const periodStr = hasYears
       ? `${a.period_start_year}–${a.period_end_year}`
-      : "";
-    return period
-      ? `Likely from ${place} (${period}). ${a?.description || ""}`.trim()
-      : a?.description || "No origin information.";
+      : s.period || "";
+    const typicalUse = s.typical_use;
+    const material = s.material;
+    const sentences = [];
+    if (place || periodStr) {
+      sentences.push(
+        periodStr
+          ? `This piece likely originates from ${place} and dates to the ${periodStr} period.`
+          : `This piece likely originates from ${place}.`,
+      );
+    }
+    if (region && region !== place) {
+      sentences.push(`More specifically, it may be from ${region}.`);
+    }
+    if (typicalUse) {
+      const useText =
+        {
+          circulation: "circulation or trade",
+          decoration: "decoration",
+          ceremony: "ceremonial use",
+        }[typicalUse.toLowerCase()] || typicalUse;
+      sentences.push(`It was typically used for ${useText}.`);
+    }
+    if (material) {
+      sentences.push(`Materials are consistent with ${material}.`);
+    }
+    const desc = (a?.description || "").trim();
+    if (desc) sentences.push(desc);
+    const text = sentences.join(" ").trim();
+    return text || "No origin information.";
   };
 
   const formatHistoryDate = (iso) => {
@@ -933,34 +1210,7 @@ export default function AntiqueScreen({ route, navigation }) {
       ? Number(antique.specification.estimated_market_value_high_usd)
       : null;
   // Current market value: Gemini estimate’ga eng yaqin eBay narxi; fallback — eBay listinglarining o‘rtacha narxi. (min+max)/2 hech qachon ishlatilmaydi
-  const minNum = antique.market_value_min != null ? Number(antique.market_value_min) : 0;
-  const maxNum = antique.market_value_max != null ? Number(antique.market_value_max) : 0;
-  const ebayItemsForPrice =
-    antique?.specification?.ebay_items?.length > 0
-      ? antique.specification.ebay_items
-      : [];
-  const ebayPrices = ebayItemsForPrice
-    .map((it) => (it?.price != null ? parseFloat(String(it.price)) : NaN))
-    .filter((p) => !Number.isNaN(p) && p > 0);
-  const ebayAvg =
-    ebayPrices.length > 0
-      ? ebayPrices.reduce((s, p) => s + p, 0) / ebayPrices.length
-      : 0;
-  const targetUsd = geminiEstimate ?? (ebayAvg || minNum || maxNum || 0);
-  const closestEbayPrice =
-    targetUsd > 0 && ebayPrices.length > 0
-      ? ebayPrices.reduce((best, p) =>
-          Math.abs(p - targetUsd) < Math.abs(best - targetUsd) ? p : best
-        )
-      : 0;
-  const displayPriceUsd =
-    closestEbayPrice > 0
-      ? closestEbayPrice
-      : ebayAvg > 0
-        ? ebayAvg
-        : minNum > 0
-          ? minNum
-          : (geminiEstimate ?? 0);
+  const displayPriceUsd = getDisplayMarketValueUsd(antique);
   // Low / High: eBay dan; 0 bo‘lsa Gemini’dan (low_usd, high_usd yoki bitta estimated)
   const displayLowUsd =
     antique.market_value_min != null && Number(antique.market_value_min) > 0
@@ -983,7 +1233,7 @@ export default function AntiqueScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
+      <StatusBar style={colors.isDark ? "light" : "dark"} />
 
       {/* Image area: 1:1, rasm status bar ostiga kiradi */}
       <View style={[styles.imageArea, { height: IMAGE_SIZE }]}>
@@ -1043,396 +1293,752 @@ export default function AntiqueScreen({ route, navigation }) {
         ]}
       >
         <Animated.View style={{ flex: 1, paddingTop: sheetPaddingTop }}>
-        <Animated.View {...panResponder.panHandlers} collapsable={false}>
-          <Animated.View style={{ height: spacerHeight,}} />
-          <Animated.View
-            style={[
-              styles.handleWrap,
-              { opacity: handleOpacity, paddingVertical: handlePadding },
-            ]}
-          >
+          <Animated.View {...panResponder.panHandlers} collapsable={false}>
+            <Animated.View style={{ height: spacerHeight }} />
             <Animated.View
               style={[
-                styles.headerHandle,
-                { height: handleAnimHeight, backgroundColor: colors.border2, marginBottom: handleMarginBottom },
+                styles.handleWrap,
+                { opacity: handleOpacity, paddingVertical: handlePadding },
               ]}
-            />
-          </Animated.View>
-          {/* X va dots: yopiqda joy olmaydi (height 0), ochilish animatsiyasida paydo bo‘ladi */}
-          <Animated.View style={[styles.sheetHeaderRowWrap, { height: headerRowHeight }]}>
-            <View style={styles.sheetHeaderRow}>
-              <Animated.View style={{ opacity: closeBtnStickyOpacity }}>
-                <TouchableOpacity
-                  onPress={handleClose}
-                  style={styles.headerCloseBtn}
-                >
-                  <X size={20} color={colors.textBase} weight="bold" />
-                </TouchableOpacity>
-              </Animated.View>
-              <Animated.View style={{ opacity: closeBtnStickyOpacity }}>
-                <TouchableOpacity
-                  onPress={openOptionsSheet}
-                  style={styles.headerMenuBtn}
-                  accessibilityLabel={t("antique.moreOptions")}
-                >
-                  <DotsThreeOutlineIcon
-                    size={22}
-                    color={colors.textBase}
-                    weight="fill"
-                  />
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
-          </Animated.View>
-        </Animated.View>
-
-        <View
-          style={styles.contentScrollWrap}
-          {...contentPanResponder.panHandlers}
-        >
-          <ScrollView
-            ref={scrollRef}
-            scrollEnabled={isExpanded}
-            style={styles.contentScroll}
-            contentContainerStyle={[
-              styles.contentScrollContent,
-              { paddingBottom: isInCurrentCollection ? insets.bottom : insets.bottom + 70 },
-            ]}
-            showsVerticalScrollIndicator={false}
-            onScroll={handleContentScroll}
-            onScrollEndDrag={handleContentScrollEndDrag}
-            scrollEventThrottle={16}
-            bounces
-          >
-            <View
-              style={[styles.contentArea, { backgroundColor: colors.bgBase }]}
             >
-              <View style={styles.titleBlock}>
-                <Text style={styles.name}>{antique.name}</Text>
-                <Text style={styles.originLine}>
-                  {antique.origin_country ?? "Unknown"} ·{" "}
-                  {antique.period_start_year ?? 0} –{" "}
-                  {antique.period_end_year ?? 0} {t("antique.yrs")}
-                </Text>
-              </View>
-
-              <View style={styles.metricRow}>
-                <View style={[styles.metricCard, { width: cardWidth }]}>
-                  <CalendarBlank size={24} color={colors.brand} />
-                  <Text style={styles.metricLabel}>{t("antique.age")}</Text>
-                  <Text style={styles.metricValue}>{ageYrs} {t("antique.yrs")}</Text>
-                </View>
-                <View style={[styles.metricCard, { width: cardWidth }]}>
-                  <Medal size={24} color={colors.brand} />
-                  <Text style={styles.metricLabel}>{t("antique.rarity")}</Text>
-                  <Text style={styles.metricValue}>
-                    {rarityScore} / {rarityMax}
-                  </Text>
-                </View>
-                <View style={[styles.metricCard, { width: cardWidth }]}>
-                  <CheckCircle size={24} color={colors.brand} />
-                  <Text style={styles.metricLabel}>{t("antique.condition")}</Text>
-                  <Text style={styles.metricValue}>
-                    {antique.overall_condition_summary ?? "Good"}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.marketValueCard}>
-                <View style={styles.marketValueHeader}>
-                  <TrendUp size={20} color={colors.brand} />
-                  <Text style={styles.marketValueTitle}>{t("antique.marketAnalysis")}</Text>
-                  <View style={styles.marketValueLiveTag}>
-                    <Text style={styles.marketValueLiveText}>{t("antique.liveData")}</Text>
-                  </View>
-                </View>
-                <View style={styles.marketValueCurrentBlock}>
-                  <Text style={styles.marketValueCurrentLabel}>
-                    {t("antique.currentMarketValue")}
-                  </Text>
-                  <Text style={styles.marketValueCurrentValue}>
-                    {displayPriceUsd > 0
-                      ? formatPriceUsd(displayPriceUsd, displayCurrency, rate)
-                      : "—"}
-                  </Text>
-                </View>
-                <View style={styles.marketValueLowHighRow}>
-                  <View style={styles.marketValueLowHighBlock}>
-                    <Text style={styles.marketValueLowHighLabel}>{t("antique.low")}</Text>
-                    <Text style={styles.marketValueLowHighValue}>
-                      {displayLowUsd > 0
-                        ? formatPriceUsd(displayLowUsd, displayCurrency, rate)
-                        : "—"}
-                    </Text>
-                  </View>
-                  <View style={styles.marketValueLowHighBlock}>
-                    <Text style={styles.marketValueLowHighLabel}>{t("antique.high")}</Text>
-                    <Text style={styles.marketValueLowHighValue}>
-                      {displayHighUsd > 0
-                        ? formatPriceUsd(displayHighUsd, displayCurrency, rate)
-                        : "—"}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.tabBar}>
-                <Animated.View
-                  style={[
-                    styles.tabIndicator,
-                    {
-                      width: tabWidth,
-                      transform: [{ translateX: tabIndicatorLeft }],
-                    },
-                  ]}
-                />
-                {TAB_NAMES.map((tab) => (
-                  <Pressable
-                    key={tab}
-                    style={[styles.tab, activeTab === tab && styles.tabActive]}
-                    onPress={() => handleTabPress(tab)}
-                  >
-                    <Text
-                      style={[
-                        styles.tabText,
-                        activeTab === tab && styles.tabTextActive,
-                      ]}
-                    >
-                      {tab === "details"
-                        ? t("antique.tabDetails")
-                        : tab === "condition"
-                          ? t("antique.tabCondition")
-                          : t("antique.tabHistory")}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
               <Animated.View
                 style={[
-                  styles.tabPanelWrap,
+                  styles.headerHandle,
                   {
-                    opacity: tabContentOpacity,
-                    transform: [{ translateY: tabContentTranslateY }],
+                    height: handleAnimHeight,
+                    backgroundColor: colors.border2,
+                    marginBottom: handleMarginBottom,
                   },
                 ]}
+              />
+            </Animated.View>
+            {/* X va dots: yopiqda joy olmaydi (height 0), ochilish animatsiyasida paydo bo‘ladi */}
+            <Animated.View
+              style={[styles.sheetHeaderRowWrap, { height: headerRowHeight }]}
+            >
+              <View style={styles.sheetHeaderRow}>
+                <Animated.View style={{ opacity: closeBtnStickyOpacity }}>
+                  <TouchableOpacity
+                    onPress={handleClose}
+                    style={styles.headerCloseBtn}
+                  >
+                    <X size={20} color={colors.textBase} weight="bold" />
+                  </TouchableOpacity>
+                </Animated.View>
+                <Animated.View style={{ opacity: closeBtnStickyOpacity }}>
+                  <TouchableOpacity
+                    onPress={openOptionsSheet}
+                    style={styles.headerMenuBtn}
+                    accessibilityLabel={t("antique.moreOptions")}
+                  >
+                    <DotsThreeOutlineIcon
+                      size={22}
+                      color={colors.textBase}
+                      weight="fill"
+                    />
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            </Animated.View>
+          </Animated.View>
+
+          <View
+            style={styles.contentScrollWrap}
+            {...contentPanResponder.panHandlers}
+          >
+            {showStickyBar && (
+              <View
+                style={[
+                  styles.stickySectionRowStuck,
+                  { backgroundColor: colors.bgBase },
+                ]}
+                pointerEvents="box-none"
               >
-                {activeTab === "details" && (
-                  <View style={styles.tabPanel}>
-                    <Text style={styles.sectionTitle}>{t("antique.description")}</Text>
-                    <Text style={styles.bodyText}>
-                      {antique.description || t("antique.noDescription")}
-                    </Text>
+                <ScrollView
+                  ref={stickySectionScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={[
+                    styles.stickySectionRowScrollContent,
+                    styles.stickySectionRowScrollContentStuck,
+                    styles.stickySectionRowWrap,
+                  ]}
+                  style={styles.stickySectionRowScroll}
+                >
+                  {TAB_NAMES.map((tab, index) => (
+                    <Pressable
+                      key={tab}
+                      style={[
+                        styles.stickySectionBtn,
+                        activeSectionIndex === index &&
+                          styles.stickySectionBtnActive,
+                      ]}
+                      onPress={() => scrollToSection(index)}
+                    >
+                      <Text
+                        style={[
+                          styles.stickySectionBtnText,
+                          activeSectionIndex === index &&
+                            styles.stickySectionBtnTextActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {getTabLabel(tab)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            <ScrollView
+              ref={scrollRef}
+              scrollEnabled={isExpanded}
+              style={styles.contentScroll}
+              contentContainerStyle={[
+                styles.contentScrollContent,
+                {
+                  paddingBottom: isInCurrentCollection
+                    ? insets.bottom
+                    : insets.bottom + 70,
+                },
+              ]}
+              showsVerticalScrollIndicator={false}
+              onScroll={(e) => {
+                handleContentScroll(e);
+                handleScrollSection(e);
+              }}
+              onMomentumScrollEnd={() => {
+                scrollingToSectionIndexRef.current = null;
+              }}
+              onScrollEndDrag={handleContentScrollEndDrag}
+              scrollEventThrottle={16}
+              bounces={bouncesEnabled}
+            >
+              <View
+                style={[styles.contentArea, { backgroundColor: colors.bgBase }]}
+              >
+                <View style={styles.titleBlock}>
+                  <Text style={styles.name}>{antique.name}</Text>
+                  <Text style={styles.originLine}>{originLineText}</Text>
+                </View>
 
-                    <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-                      {t("antique.specification")}
+                {/* Age and rarity section */}
+                <View style={styles.metricRow}>
+                  <View style={[styles.metricCard, { width: cardWidth }]}>
+                    <CalendarBlank size={24} color={colors.brand} />
+                    <Text style={styles.metricLabel}>{t("antique.age")}</Text>
+                    <Text style={styles.metricValue}>{ageDisplay}</Text>
+                  </View>
+                  <View style={[styles.metricCard, { width: cardWidth }]}>
+                    <Medal size={24} color={colors.brand} />
+                    <Text style={styles.metricLabel}>
+                      {t("antique.rarity")}
                     </Text>
-                    <View style={styles.specList}>
-                      {getSpecificationRows(antique).map(
-                        ({ key: specKey, value }) => (
-                          <View key={specKey} style={styles.specRow}>
-                            <Text style={styles.specLabel}>
-                              {specKey.startsWith("antique.") ? t(specKey) : specKey}
-                            </Text>
-                            <Text style={styles.specValue}>
-                              {value ?? (specKey === "antique.noSpecification" ? t("antique.noSpecification") : "—")}
-                            </Text>
-                          </View>
-                        ),
+                    <Text style={styles.metricValue}>{rarityDisplay}</Text>
+                  </View>
+                  <View style={[styles.metricCard, { width: cardWidth }]}>
+                    <CheckCircle size={24} color={colors.brand} />
+                    <Text style={styles.metricLabel}>
+                      {t("antique.condition")}
+                    </Text>
+                    <Text style={styles.metricValue}>
+                      {normalizeConditionSummary(
+                        antique.overall_condition_summary,
                       )}
-                    </View>
-
-                    <View style={styles.originCard}>
-                      <View style={styles.originTitleRow}>
-                        <MapPin size={18} color={colors.textBase} />
-                        <Text style={styles.originTitle}>
-                          {t("antique.originProvenance")}
-                        </Text>
-                      </View>
-                      <Text style={styles.originText}>
-                        {antique.origin_provenance ||
-                          buildOriginProvenanceFallback(antique)}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                {activeTab === "condition" && (
-                  <View style={styles.tabPanel}>
-                    <View style={styles.conditionGradeBlock}>
-                      <View style={styles.conditionGradeCircle}>
-                        <Text style={styles.conditionGradeText}>
-                          {antique.condition_grade ?? "B+"}
-                        </Text>
-                      </View>
-                      <Text style={styles.conditionOverallTitle}>
-                        {t("antique.overallCondition")}:{" "}
-                        {antique.overall_condition_summary ?? "Good"}
-                      </Text>
-                      <Text style={styles.conditionOverallSubtitle}>
-                        {antique.condition_description ||
-                          t("antique.wellPreserved")}
-                      </Text>
-                    </View>
-                    <View style={styles.conditionList}>
-                      <ConditionRow
-                        label={t("antique.conditionMechanical")}
-                        status={antique.mechanical_function_status ?? "N/A"}
-                        statusStyle={getConditionStyle(
-                          "Mechanical Function",
-                          antique.mechanical_function_status,
-                        )}
-                        note={antique.mechanical_function_notes}
-                        styles={styles}
-                        colors={colors}
-                      />
-                      <ConditionRow
-                        label={t("antique.conditionCase")}
-                        status={antique.case_condition_status ?? "N/A"}
-                        statusStyle={getConditionStyle(
-                          "Case Condition",
-                          antique.case_condition_status,
-                        )}
-                        note={antique.case_condition_notes}
-                        styles={styles}
-                        colors={colors}
-                      />
-                      <ConditionRow
-                        label={t("antique.conditionDialHands")}
-                        status={antique.dial_hands_condition_status ?? "N/A"}
-                        statusStyle={getConditionStyle(
-                          "Dial & Hands",
-                          antique.dial_hands_condition_status,
-                        )}
-                        note={antique.dial_hands_condition_notes}
-                        styles={styles}
-                        colors={colors}
-                      />
-                      <ConditionRow
-                        label={t("antique.conditionCrystal")}
-                        status={antique.crystal_condition_status ?? "N/A"}
-                        statusStyle={getConditionStyle(
-                          "Crystal",
-                          antique.crystal_condition_status,
-                        )}
-                        note={antique.crystal_condition_notes}
-                        styles={styles}
-                        colors={colors}
-                      />
-                    </View>
-                  </View>
-                )}
-
-                {activeTab === "history" && (
-                  <View style={styles.tabPanel}>
-                    <Text style={styles.sectionTitle}>{t("antique.acquisitionDetails")}</Text>
-                    <View style={styles.acquisitionRows}>
-                      <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>{t("antique.dateAdded")}</Text>
-                        <Text style={styles.metaValue}>
-                          {formatHistoryDate(antique.created_at)}
-                        </Text>
-                      </View>
-                      <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>{t("antique.source")}</Text>
-                        <Text style={styles.metaValue}>
-                          {antique.source || t("antique.aiAnalysis")}
-                        </Text>
-                      </View>
-                      <View style={[styles.metaRow, { borderBottomWidth: 0 }]}>
-                        <Text style={styles.metaLabel}>{t("antique.purchasePrice")}</Text>
-                        <Text style={styles.metaValue}>
-                          {formatPurchasePrice(antique.purchase_price)}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
-                      {t("antique.itemTimeline")}
                     </Text>
-                    <View style={styles.timeline}>
-                      <TimelineItem
-                        Icon={Cube}
-                        title={t("antique.timelineManufactured")}
-                        subtitle={`${antique.period_start_year || "?"}–${antique.period_end_year || "?"} • ${antique.origin_country || "Unknown"}`}
-                        isFirst
-                        isLast={false}
-                        styles={styles}
-                        colors={colors}
-                      />
-                      <TimelineItem
-                        Icon={Eye}
-                        title={t("antique.timelineIdentified")}
-                        subtitle={`${formatHistoryDate(antique.created_at)} • ${t("antique.aiAnalysis")}`}
-                        isFirst={false}
-                        isLast={false}
-                        styles={styles}
-                        colors={colors}
-                      />
-                      <TimelineItem
-                        Icon={CheckCircle}
-                        title={t("antique.timelineConditionAssessed")}
-                        subtitle={`${formatHistoryDate(antique.created_at)} • Grade: ${antique.overall_condition_summary || "Good"} (${antique.condition_grade || "B+"})`}
-                        isFirst={false}
-                        isLast
-                        styles={styles}
-                        colors={colors}
-                      />
+                  </View>
+                </View>
+
+                {/* Market value section */}
+                <View style={styles.marketValueCard}>
+                  <View style={styles.marketValueHeader}>
+                    <TrendUp size={20} color={colors.brand} />
+                    <View style={styles.marketValueTitleContainer}>
+                      <Text style={styles.marketValueTitle}>
+                        {t("antique.marketAnalysis")}
+                      </Text>
+                      <Text style={styles.marketValueDescription}>
+                        Pricing sourced from eBay
+                      </Text>
+                    </View>
+                    <View style={styles.marketValueLiveTag}>
+                      <Text style={styles.marketValueLiveText}>
+                        {t("antique.liveData")}
+                      </Text>
                     </View>
                   </View>
-                )}
-              </Animated.View>
-
-              {/* Sahifa oxirida: eBay o‘rtacha narx atrofidagi 4 ta mahsulot — 2 ustunli grid */}
-              {loadingEbay ? (
-                <View style={[styles.ebayCard, styles.ebayCardLoading]}>
-                  <ActivityIndicator size="small" color={colors.brand} />
-                  <Text style={styles.ebayLoadingText}>{t("antique.loadingEbay")}</Text>
-                </View>
-              ) : ebayGridItems.length > 0 ? (
-                <View style={styles.ebayGridWrap}>
-                  <Text style={styles.ebaySectionTitle}>
-                  {t("scanner.buySimilarEbay")}
-                  </Text>
-                  <View style={styles.ebayGrid}>
-                    {ebayGridItems.map((item, idx) => {
-                      const cardW = (width - 32 - 10) / 2;
-                      const url = item.itemWebUrl || firstEbayUrl;
-                      return (
-                        <Pressable
-                          key={idx}
-                          style={[styles.ebayGridCard, { width: cardW }]}
-                          onPress={() => url && Linking.openURL(url)}
-                        >
-                          <View style={styles.ebayGridCardImageWrap}>
-                            {item.imageUrl ? (
-                              <Image
-                                source={{ uri: item.imageUrl }}
-                                style={styles.ebayGridCardImage}
-                                resizeMode="cover"
-                              />
-                            ) : (
-                              <View style={[styles.ebayGridCardImage, styles.ebayGridCardImagePlaceholder]} />
-                            )}
-                          </View>
-                          <Text style={styles.ebayGridCardTitle} numberOfLines={2}>
-                            {item.title || "eBay item"}
-                          </Text>
-                          <View style={styles.ebayGridCardBottom}>
-                            <Text style={styles.ebayGridCardPrice} numberOfLines={1}>
-                              {item.price ? `$${item.price}` : "—"}
-                            </Text>
-                            <CaretRight size={18} color={colors.textTertiary} weight="bold" />
-                          </View>
-                        </Pressable>
-                      );
-                    })}
+                  <View style={styles.marketValueCurrentBlock}>
+                    <Text style={styles.marketValueCurrentLabel}>
+                      {t("antique.currentMarketValue")}
+                    </Text>
+                    <Text style={styles.marketValueCurrentValue}>
+                      {displayPriceUsd > 0
+                        ? formatPriceUsd(displayPriceUsd, displayCurrency, rate)
+                        : "—"}
+                    </Text>
+                  </View>
+                  <View style={styles.marketValueLowHighRow}>
+                    <View style={styles.marketValueLowHighBlock}>
+                      <Text style={styles.marketValueLowHighLabel}>
+                        {t("antique.low")}
+                      </Text>
+                      <Text style={styles.marketValueLowHighValue}>
+                        {displayLowUsd > 0
+                          ? formatPriceUsd(displayLowUsd, displayCurrency, rate)
+                          : "—"}
+                      </Text>
+                    </View>
+                    <View style={styles.marketValueLowHighBlock}>
+                      <Text style={styles.marketValueLowHighLabel}>
+                        {t("antique.high")}
+                      </Text>
+                      <Text style={styles.marketValueLowHighValue}>
+                        {displayHighUsd > 0
+                          ? formatPriceUsd(
+                              displayHighUsd,
+                              displayCurrency,
+                              rate,
+                            )
+                          : "—"}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              ) : null}
-            </View>
-          </ScrollView>
-        </View>
+
+                {/* Sticky section buttons */}
+                <View
+                  style={[
+                    styles.sectionButtonsInFlow,
+                    showStickyBar && styles.sectionButtonsInFlowHidden,
+                  ]}
+                  onLayout={(e) => {
+                    const y = e.nativeEvent.layout.y;
+                    setButtonRowY(y);
+                  }}
+                >
+                  <ScrollView
+                    ref={inFlowSectionScrollRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={[
+                      styles.stickySectionRowScrollContent,
+                      styles.stickySectionRowScrollContentStuck,
+                      styles.stickySectionRowWrap,
+                      { backgroundColor: colors.bgBase },
+                    ]}
+                    style={styles.stickySectionRowScroll}
+                  >
+                    {TAB_NAMES.map((tab, index) => (
+                      <Pressable
+                        key={tab}
+                        style={[
+                          styles.stickySectionBtn,
+                          activeSectionIndex === index &&
+                            styles.stickySectionBtnActive,
+                        ]}
+                        onPress={() => scrollToSection(index)}
+                      >
+                        <Text
+                          style={[
+                            styles.stickySectionBtnText,
+                            activeSectionIndex === index &&
+                              styles.stickySectionBtnTextActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {getTabLabel(tab)}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* Description section */}
+                <View
+                  style={styles.tabPanel}
+                  onLayout={(e) =>
+                    reportSectionLayout(0, e.nativeEvent.layout.y)
+                  }
+                >
+                  <Text style={styles.sectionTitle}>
+                    {t("antique.description")}
+                  </Text>
+                  <Text style={styles.bodyText}>{descriptionText}</Text>
+
+                  <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+                    {t("antique.specification")}
+                  </Text>
+                  <View style={styles.specList}>
+                    {getDetailsSpecRows(antique).map(({ labelKey, value }) => (
+                      <View key={labelKey} style={styles.specRow}>
+                        <Text style={styles.specLabel}>{t(labelKey)}</Text>
+                        <Text style={styles.specValue}>{value ?? "—"}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+                    {t("antique.valueInsight")}
+                  </Text>
+                  <View style={styles.specList}>
+                    {getValueInsightRows(antique).map(({ labelKey, value }) => (
+                      <View key={labelKey} style={styles.specRow}>
+                        <Text style={styles.specLabel}>{t(labelKey)}</Text>
+                        <Text style={styles.specValue}>{value ?? "—"}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Condition section */}
+                <View
+                  style={[styles.tabPanel, { marginTop: 24 }]}
+                  onLayout={(e) =>
+                    reportSectionLayout(1, e.nativeEvent.layout.y)
+                  }
+                >
+                  <View style={styles.conditionGradeBlock}>
+                    <View
+                      style={[
+                        styles.conditionGradeCircle,
+                        {
+                          backgroundColor: rarityCircleColors.bg,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.conditionGradeText,
+                          { color: rarityCircleColors.text },
+                        ]}
+                      >
+                        {rarityDisplay}
+                      </Text>
+                    </View>
+                    <Text style={styles.conditionOverallTitle}>
+                      {normalizeConditionSummary(
+                        antique.overall_condition_summary,
+                      )}
+                    </Text>
+                    <Text style={styles.conditionOverallSubtitle}>
+                      {antique.condition_description ||
+                        t("antique.wellPreserved")}
+                    </Text>
+                  </View>
+                  <View style={styles.conditionList}>
+                    <ConditionBadgeRow
+                      label={t("antique.conditionSurfaceCondition")}
+                      value={
+                        antique.specification?.surface_condition ??
+                        antique.surface_condition
+                      }
+                      options={CONDITION_BADGE_OPTIONS.surface_condition}
+                      styles={styles}
+                    />
+                    <ConditionBadgeRow
+                      label={t("antique.conditionStructuralIntegrity")}
+                      value={
+                        antique.specification?.structural_integrity ??
+                        antique.structural_integrity
+                      }
+                      options={CONDITION_BADGE_OPTIONS.structural_integrity}
+                      styles={styles}
+                    />
+                    <ConditionBadgeRow
+                      label={t("antique.conditionAgeWear")}
+                      value={
+                        antique.specification?.age_wear ?? antique.age_wear
+                      }
+                      options={CONDITION_BADGE_OPTIONS.age_wear}
+                      styles={styles}
+                    />
+                    <ConditionBadgeRow
+                      label={t("antique.conditionAuthenticityMarkers")}
+                      value={
+                        antique.specification?.authenticity_markers ??
+                        antique.authenticity_markers
+                      }
+                      options={CONDITION_BADGE_OPTIONS.authenticity_markers}
+                      styles={styles}
+                    />
+                  </View>
+                </View>
+
+                {/* Provenance section */}
+                <View
+                  style={[styles.tabPanel, { marginTop: 24, padding: 0 }]}
+                  onLayout={(e) =>
+                    reportSectionLayout(2, e.nativeEvent.layout.y)
+                  }
+                >
+                  <View style={[styles.originCard, { marginTop: 0 }]}>
+                    <View style={styles.originTitleRow}>
+                      <MapPin size={18} color={colors.textBase} />
+                      <Text style={styles.originTitle}>
+                        {t("antique.originProvenance")}
+                      </Text>
+                    </View>
+                    {(antique.specification?.region_of_origin ||
+                      antique.specification?.typical_use) && (
+                      <View style={styles.originMetaRow}>
+                        {antique.specification?.region_of_origin != null && (
+                          <View style={styles.originMetaItem}>
+                            <Text style={styles.originMetaLabel}>
+                              {t("antique.regionOfOrigin")}
+                            </Text>
+                            <Text style={styles.originMetaValue}>
+                              {antique.specification.region_of_origin}
+                            </Text>
+                          </View>
+                        )}
+                        {antique.specification?.typical_use != null && (
+                          <View style={styles.originMetaItem}>
+                            <Text style={styles.originMetaLabel}>
+                              {t("antique.typicalUse")}
+                            </Text>
+                            <Text style={styles.originMetaValue}>
+                              {(() => {
+                                const key = `antique.typicalUse_${antique.specification.typical_use}`;
+                                const translated = t(key);
+                                return translated !== key
+                                  ? translated
+                                  : antique.specification.typical_use;
+                              })()}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                    <Text style={styles.originText}>
+                      {antique.origin_provenance ||
+                        buildOriginProvenanceFallback(antique)}
+                    </Text>
+                  </View>
+                  {/* <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
+                    {t("antique.acquisitionDetails")}
+                  </Text>
+                  <View style={styles.acquisitionRows}>
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>
+                        {t("antique.dateAdded")}
+                      </Text>
+                      <Text style={styles.metaValue}>
+                        {formatHistoryDate(antique.created_at)}
+                      </Text>
+                    </View>
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>
+                        {t("antique.source")}
+                      </Text>
+                      <Text style={styles.metaValue}>
+                        {antique.source || t("antique.aiAnalysis")}
+                      </Text>
+                    </View>
+                    <View
+                      style={[styles.metaRow, { borderBottomWidth: 0 }]}
+                    >
+                      <Text style={styles.metaLabel}>
+                        {t("antique.purchasePrice")}
+                      </Text>
+                      <Text style={styles.metaValue}>
+                        {formatPurchasePrice(antique.purchase_price)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
+                    {t("antique.itemTimeline")}
+                  </Text>
+                  <View style={styles.timeline}>
+                    <TimelineItem
+                      Icon={Cube}
+                      title={t("antique.timelineManufactured")}
+                      subtitle={`${antique.period_start_year || "?"}–${antique.period_end_year || "?"} • ${antique.origin_country || "Unknown"}`}
+                      isFirst
+                      isLast={false}
+                      styles={styles}
+                      colors={colors}
+                    />
+                    <TimelineItem
+                      Icon={Eye}
+                      title={t("antique.timelineIdentified")}
+                      subtitle={`${formatHistoryDate(antique.created_at)} • ${t("antique.aiAnalysis")}`}
+                      isFirst={false}
+                      isLast={false}
+                      styles={styles}
+                      colors={colors}
+                    />
+                    <TimelineItem
+                      Icon={CheckCircle}
+                      title={t("antique.timelineConditionAssessed")}
+                      subtitle={`${formatHistoryDate(antique.created_at)} • ${normalizeConditionSummary(antique.overall_condition_summary)} • Rarity: ${rarityScore}/${rarityMax}`}
+                      isFirst={false}
+                      isLast
+                      styles={styles}
+                      colors={colors}
+                    />
+                  </View> */}
+                </View>
+
+                {/* Authenticity section */}
+                <View
+                  style={[styles.tabPanel, { marginTop: 24 }]}
+                  onLayout={(e) =>
+                    reportSectionLayout(3, e.nativeEvent.layout.y)
+                  }
+                >
+                  <Text style={styles.sectionTitle}>
+                    {t("antique.tabAuthenticity")}
+                  </Text>
+                  <View style={styles.authenticityConfidenceRow}>
+                    <Text style={styles.specLabel}>
+                      {t("antique.authenticityConfidenceLevel")}
+                    </Text>
+                    <View
+                      style={[
+                        styles.authenticityConfidenceBadge,
+                        styles[
+                          `authenticityConfidence_${(
+                            antique.specification
+                              ?.authenticity_confidence_level || "medium"
+                          ).toLowerCase()}`
+                        ],
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.authenticityConfidenceText,
+                          styles[
+                            `authenticityConfidenceText_${(
+                              antique.specification
+                                ?.authenticity_confidence_level || "medium"
+                            ).toLowerCase()}`
+                          ],
+                        ]}
+                      >
+                        {antique.specification?.authenticity_confidence_level ??
+                          "—"}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.specList}>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>
+                        {t("antique.authenticityMaterialMatch")}
+                      </Text>
+                      <Text style={styles.specValue}>
+                        {antique.specification?.authenticity_material_match ===
+                        true
+                          ? "✓"
+                          : antique.specification
+                                ?.authenticity_material_match === false
+                            ? "✗"
+                            : "—"}
+                      </Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>
+                        {t("antique.authenticityStyleMatch")}
+                      </Text>
+                      <Text style={styles.specValue}>
+                        {antique.specification?.authenticity_style_match ===
+                        true
+                          ? "✓"
+                          : antique.specification?.authenticity_style_match ===
+                              false
+                            ? "✗"
+                            : "—"}
+                      </Text>
+                    </View>
+                    <View style={[styles.specRow, { borderBottomWidth: 0 }]}>
+                      <Text style={styles.specLabel}>
+                        {t("antique.authenticityWearPattern")}
+                      </Text>
+                      <Text style={styles.specValue}>
+                        {antique.specification?.authenticity_wear_pattern ===
+                        true
+                          ? "✓"
+                          : antique.specification?.authenticity_wear_pattern ===
+                              false
+                            ? "✗"
+                            : "—"}
+                      </Text>
+                    </View>
+                  </View>
+                  {(
+                    antique.specification?.authenticity_known_red_flags ?? ""
+                  ).trim() !== "" && (
+                    <View style={styles.authenticityRedFlags}>
+                      <Text style={styles.authenticityRedFlagsLabel}>
+                        {t("antique.authenticityKnownRedFlags")}
+                      </Text>
+                      <Text style={styles.authenticityRedFlagsText}>
+                        {antique.specification.authenticity_known_red_flags}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={styles.authenticityDisclaimer}>
+                    {t("antique.authenticityDisclaimer")}
+                  </Text>
+                </View>
+
+                {/* Care tips section */}
+                <View
+                  style={[styles.tabPanel, { marginTop: 24 }]}
+                  onLayout={(e) =>
+                    reportSectionLayout(4, e.nativeEvent.layout.y)
+                  }
+                >
+                  <Text style={styles.sectionTitle}>
+                    {t("antique.tabCareTips")}
+                  </Text>
+                  <Text style={styles.bodyText}>
+                    {antique.specification?.care_tips?.trim() ||
+                      t("antique.careTipsPlaceholder")}
+                  </Text>
+                </View>
+
+                {/* eBay section */}
+                <View
+                  style={{ marginVertical: 24 }}
+                  onLayout={(e) =>
+                    reportSectionLayout(5, e.nativeEvent.layout.y)
+                  }
+                >
+                  <View style={styles.ebaySectionHeader}>
+                    <Text style={styles.ebaySectionTitle}>
+                      {t("antique.ebaySimilarProducts")}
+                    </Text>
+                    <View style={styles.ebayLiveBadge}>
+                      <Text style={styles.ebayLiveBadgeText}>
+                        {t("antique.ebayLive")}
+                      </Text>
+                    </View>
+                  </View>
+                  {!isPro ? (
+                    <Pressable
+                      style={[
+                        styles.ebayUnlockCard,
+                        { backgroundColor: colors.bgWhite },
+                      ]}
+                      onPress={() =>
+                        navigation.navigate("Pro", { fromAntique: true })
+                      }
+                    >
+                      <Text style={styles.ebayUnlockTitle}>
+                        {t("antique.ebayUnlockTitle")}
+                      </Text>
+                      <Text style={styles.ebayUnlockSubtitle}>
+                        {t("antique.ebayUnlockSubtitle")}
+                      </Text>
+                      <View style={styles.ebayUnlockBtnWrap}>
+                        <Text style={styles.ebayUnlockBtnText}>
+                          {t("antique.ebayUnlockButton")}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ) : loadingEbay ? (
+                    <View style={[styles.ebayCard, styles.ebayCardLoading]}>
+                      <ActivityIndicator size="small" color={colors.brand} />
+                      <Text style={styles.ebayLoadingText}>
+                        {t("antique.loadingEbay")}
+                      </Text>
+                    </View>
+                  ) : ebayGridItems.length > 0 ? (
+                    <View style={styles.ebayGridWrap}>
+                      <View style={styles.ebayGrid}>
+                        {ebayGridItems.map((item, idx) => {
+                          const cardW = (width - 32 - 10) / 2;
+                          const url = item.itemWebUrl || firstEbayUrl;
+                          return (
+                            <Pressable
+                              key={idx}
+                              style={[styles.ebayGridCard, { width: cardW }]}
+                              onPress={() => url && Linking.openURL(url)}
+                            >
+                              <View style={styles.ebayGridCardImageWrap}>
+                                {item.imageUrl ? (
+                                  <Image
+                                    source={{ uri: item.imageUrl }}
+                                    style={styles.ebayGridCardImage}
+                                    resizeMode="cover"
+                                  />
+                                ) : (
+                                  <View
+                                    style={[
+                                      styles.ebayGridCardImage,
+                                      styles.ebayGridCardImagePlaceholder,
+                                    ]}
+                                  />
+                                )}
+                              </View>
+                              <Text
+                                style={styles.ebayGridCardTitle}
+                                numberOfLines={2}
+                              >
+                                {item.title || "eBay item"}
+                              </Text>
+                              <View style={styles.ebayGridCardBottom}>
+                                <Text
+                                  style={styles.ebayGridCardPrice}
+                                  numberOfLines={1}
+                                >
+                                  {item.price ? `$${item.price}` : "—"}
+                                </Text>
+                                <CaretRight
+                                  size={18}
+                                  color={colors.textTertiary}
+                                  weight="bold"
+                                />
+                              </View>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Expert section */}
+                <View
+                  style={[styles.tabPanel, { marginTop: 0, padding: 0 }]}
+                  onLayout={(e) =>
+                    reportSectionLayout(6, e.nativeEvent.layout.y)
+                  }
+                >
+                  <Pressable
+                    style={[styles.expertCard]}
+                    onPress={() =>
+                      navigation.navigate("AssistantChat", {
+                        fromExpertTab: true,
+                        itemCategory:
+                          antique?.specification?.category ??
+                          antique?.category?.[0],
+                      })
+                    }
+                  >
+                    <View
+                      style={[styles.expertCardContent, { marginLeft: 20 }]}
+                    >
+                      <Text style={styles.expertCardTitle}>
+                        {t("antique.expertCardTitle")}
+                      </Text>
+                      <Text style={styles.expertCardSubtitle}>
+                        {t("antique.expertCardSubtitle")}
+                      </Text>
+                    </View>
+                    <View style={styles.expertCardIllustration}>
+                      <Image
+                        source={require("../../assets/bro.png")}
+                        style={styles.expertCardImage}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  </Pressable>
+                </View>
+                <View style={{ height: 16 }}></View>
+              </View>
+            </ScrollView>
+          </View>
         </Animated.View>
       </Animated.View>
 
@@ -1452,7 +2058,11 @@ export default function AntiqueScreen({ route, navigation }) {
                 if (collectionForLink) {
                   navigation.navigate("CollectionDetail", {
                     collectionId: collectionForLink.id,
-                    collectionName: collectionForLink.collection_name === SAVED_COLLECTION_NAME ? t("collection.savedName") : collectionForLink.collection_name,
+                    collectionName:
+                      collectionForLink.collection_name ===
+                      SAVED_COLLECTION_NAME
+                        ? t("collection.savedName")
+                        : collectionForLink.collection_name,
                     antiquesIds: collectionForLink.antiques_ids || [],
                   });
                 } else {
@@ -1460,11 +2070,15 @@ export default function AntiqueScreen({ route, navigation }) {
                 }
               }}
             >
-              <Text style={styles.addBtnText}>{t("antique.seeYourCollection")}</Text>
+              <Text style={styles.addBtnText}>
+                {t("antique.seeYourCollection")}
+              </Text>
             </Pressable>
           ) : (
             <Pressable style={styles.addBtn} onPress={handleOpenAddSheet}>
-              <Text style={styles.addBtnText}>{t("antique.addToCollection")}</Text>
+              <Text style={styles.addBtnText}>
+                {t("antique.addToCollection")}
+              </Text>
             </Pressable>
           )}
         </View>
@@ -1519,7 +2133,9 @@ export default function AntiqueScreen({ route, navigation }) {
               )}
               <Pressable style={styles.optionsSheetRow} onPress={handleShare}>
                 <ShareNetwork size={22} color={colors.textBase} weight="bold" />
-                <Text style={styles.optionsSheetRowText}>{t("antique.share")}</Text>
+                <Text style={styles.optionsSheetRowText}>
+                  {t("antique.share")}
+                </Text>
               </Pressable>
               <Pressable
                 style={[styles.optionsSheetRow, styles.optionsSheetRowDanger]}
@@ -1575,14 +2191,18 @@ export default function AntiqueScreen({ route, navigation }) {
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>{t("antique.addToCollectionSheet")}</Text>
+              <Text style={styles.sheetTitle}>
+                {t("antique.addToCollectionSheet")}
+              </Text>
               {loadingCollections ? (
                 <View style={styles.sheetLoading}>
                   <ActivityIndicator size="small" color={colors.brand} />
                 </View>
               ) : collections.length === 0 ? (
                 <View style={styles.sheetEmpty}>
-                  <Text style={styles.sheetEmptyText}>{t("antique.noCollectionsYet")}</Text>
+                  <Text style={styles.sheetEmptyText}>
+                    {t("antique.noCollectionsYet")}
+                  </Text>
                   <Pressable
                     style={[styles.sheetRow, styles.sheetRowCreate]}
                     onPress={handleCreateNewCollection}
@@ -1612,7 +2232,7 @@ export default function AntiqueScreen({ route, navigation }) {
                         style={styles.sheetRow}
                         onPress={() =>
                           alreadyIn
-                            ?                             Alert.alert(
+                            ? Alert.alert(
                                 t("antique.alreadyAdded"),
                                 t("antique.alreadyInCollection"),
                               )
@@ -1629,7 +2249,9 @@ export default function AntiqueScreen({ route, navigation }) {
                           />
                         )}
                         <Text style={styles.sheetRowText} numberOfLines={1}>
-                          {coll.collection_name === SAVED_COLLECTION_NAME ? t("collection.savedName") : (coll.collection_name || "Collection")}
+                          {coll.collection_name === SAVED_COLLECTION_NAME
+                            ? t("collection.savedName")
+                            : coll.collection_name || "Collection"}
                         </Text>
                         <Text style={styles.sheetRowSubtext}>
                           {ids.length} {t("antique.itemsCount")}
@@ -1660,706 +2282,947 @@ export default function AntiqueScreen({ route, navigation }) {
 
 function createStyles(colors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bgBase },
-  center: { justifyContent: "center", alignItems: "center" },
-  imageArea: {
-    width: "100%",
-    backgroundColor: colors.bgBaseElevated,
-  },
-  heroImage: {
-    width: "100%",
-    backgroundColor: colors.bgBaseElevated,
-  },
-  contentSheet: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  handleWrap: {
-    alignSelf: "center",
-  },
-  headerHandle: {
-    width: 40,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  sheetHeaderRowWrap: {
-    overflow: "hidden",
-  },
-  sheetHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  contentScrollWrap: { flex: 1 },
-  contentScroll: { flex: 1 },
-  contentScrollContent: { paddingTop: 0 },
-  contentArea: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
-  headerCloseBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.bgWhite,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerMenuBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.bgWhite,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 0, paddingTop: 0 },
-  mainImage: {
-    width: "100%",
-    height: 320,
-    borderRadius: 16,
-    // backgroundColor: colors.border1,
-    marginBottom: 16,
-  },
-  placeholderImage: {},
-  titleBlock: { marginBottom: 16 },
-  name: {
-    fontSize: 22,
-    fontFamily: fonts.bold,
-    color: colors.textBase,
-    lineHeight: 28,
-  },
-  originLine: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  metricRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 16,
-  },
-  metricCard: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 16,
-    padding: 14,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  metricLabel: {
-    fontSize: 12,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    marginTop: 8,
-  },
-  metricValue: {
-    fontSize: 14,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-    marginTop: 2,
-  },
-  marketValueCard: {
-    backgroundColor: colors.brandLightElevated,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  marketValueHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 14,
-  },
-  marketValueTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: fonts.medium,
-    color: colors.textBase,
-  },
-  marketValueLiveTag: {
-    backgroundColor: colors.brand,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  marketValueLiveText: {
-    fontSize: 11,
-    fontFamily: fonts.semiBold,
-    color: colors.textWhite,
-    letterSpacing: 0.5,
-  },
-  marketValueCurrentBlock: {
-    backgroundColor: colors.bgWhiteA3,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    alignItems: "center",
-  },
-  marketValueCurrentLabel: {
-    fontSize: 16,
-    fontFamily: fonts.medium,
-    color: colors.textBase,
-    marginBottom: 6,
-  },
-  marketValueCurrentValue: {
-    fontSize: 30,
-    fontFamily: fonts.semiBold,
-    color: colors.brand,
-  },
-  marketValueLowHighRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  marketValueLowHighBlock: {
-    flex: 1,
-    backgroundColor: colors.bgWhiteA3,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-  },
-  marketValueLowHighLabel: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  marketValueLowHighValue: {
-    fontSize: 18,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-  },
-  ebayCard: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  ebayCardLoading: {
-    alignItems: "center",
-  },
-  ebayGridWrap: {
-    marginBottom: 20,
-  },
-  ebayGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 8,
-  },
-  ebayGridCard: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 12,
-    padding: 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  ebayGridCardImageWrap: {
-    width: "100%",
-    height: 140,
-    borderTopEndRadius: 12,
-    borderTopStartRadius: 12,
-    overflow: "hidden",
-    backgroundColor: colors.border1,
-  },
-  ebayGridCardImage: {
-    width: "100%",
-    height: "100%",
-  },
-  ebayGridCardImagePlaceholder: {
-    backgroundColor: colors.border2,
-  },
-  ebayGridCardTitle: {
-    fontSize: 16,
-    fontFamily: fonts.medium,
-    color: colors.textBase,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-  },
-  ebayGridCardBottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-    paddingHorizontal: 12,
-  },
-  ebayGridCardPrice: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.brand,
-    flex: 1,
-  },
-  ebaySectionTitle: {
-    fontSize: 20,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-    marginBottom: 4,
-  },
-  ebayCardSubtext: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    marginBottom: 14,
-  },
-  ebayPrimaryBtnContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  ebayList: { marginBottom: 12 },
-  ebayItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-  },
-  ebayItemImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: colors.border1,
-  },
-  ebayItemImagePlaceholder: {},
-  ebayItemBody: { flex: 1, marginLeft: 12 },
-  ebayItemTitle: {
-    fontSize: 14,
-    fontFamily: fonts.medium,
-    color: colors.textBase,
-  },
-  ebayItemPrice: {
-    fontSize: 13,
-    fontFamily: fonts.semiBold,
-    color: colors.brand,
-    marginTop: 2,
-  },
-  ebayPrimaryBtn: {
-    backgroundColor: colors.brand,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ebayPrimaryBtnText: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.textWhite,
-  },
-  ebayLoadingText: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    marginTop: 8,
-  },
-  tabBar: {
-    position: "relative",
-    flexDirection: "row",
-    backgroundColor: colors.bgWhite,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tabIndicator: {
-    position: "absolute",
-    left: 4,
-    top: 4,
-    bottom: 4,
-    backgroundColor: colors.border1,
-    borderRadius: 10,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 10,
-  },
-  tabActive: {
-    // background is the sliding indicator
-  },
-  tabText: {
-    fontSize: 14,
-    fontFamily: fonts.medium,
-    color: colors.textSecondary,
-  },
-  tabTextActive: {
-    color: colors.textBase,
-  },
-  tabPanelWrap: {
-    marginBottom: 24,
-  },
-  tabPanel: {
-    backgroundColor: colors.bgWhite,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-    marginBottom: 8,
-  },
-  bodyText: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
-    color: colors.textBase,
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  specList: {
-    marginTop: 4,
-  },
-  specRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-  },
-  specLabel: {
-    fontSize: 14,
-    fontFamily: fonts.medium,
-    color: colors.textSecondary,
-    flex: 1,
-  },
-  specValue: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textBase,
-    marginLeft: 12,
-    flex: 1,
-    textAlign: "right",
-  },
-  originCard: {
-    marginTop: 20,
-    backgroundColor: colors.brandLight,
-    borderRadius: 12,
-    padding: 16,
-  },
-  originTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  originTitle: {
-    marginLeft: 8,
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-  },
-  originText: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
-    color: colors.textBase,
-    lineHeight: 22,
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-  },
-  metaLabel: {
-    fontSize: 14,
-    fontFamily: fonts.medium,
-    color: colors.textSecondary,
-  },
-  metaValue: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textBase,
-  },
-  conditionGradeBlock: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  conditionGradeCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.brandLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  conditionGradeText: {
-    fontSize: 24,
-    fontFamily: fonts.bold,
-    color: colors.textBase,
-  },
-  conditionOverallTitle: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-    marginBottom: 4,
-  },
-  conditionOverallSubtitle: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    textAlign: "center",
-  },
-  conditionList: {},
-  conditionRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-  conditionRowIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.greenLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  conditionRowIconBad: {
-    backgroundColor: colors.redLight,
-  },
-  conditionRowIconNeutral: {
-    backgroundColor: colors.brandLight,
-  },
-  conditionRowBody: { flex: 1 },
-  conditionRowHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  conditionRowLabel: {
-    fontSize: 15,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-  },
-  conditionRowStatusBadge: {
-    backgroundColor: colors.brandLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  conditionRowStatusBadgeBad: {
-    backgroundColor: colors.redLight,
-  },
-  conditionRowStatusBadgeNeutral: {
-    backgroundColor: colors.brandLight,
-  },
-  conditionRowStatusText: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    color: colors.textBase,
-  },
-  conditionRowStatusTextBad: {
-    color: colors.red,
-  },
-  conditionRowStatusTextNeutral: {
-    color: colors.brand,
-  },
-  conditionRowNote: {
-    fontSize: 13,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  acquisitionRows: {
-    marginTop: 4,
-  },
-  timeline: {
-    marginTop: 12,
-  },
-  timelineItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-  timelineLeft: {
-    width: 32,
-    alignItems: "center",
-  },
-  timelineLine: {
-    width: 2,
-    height: 16,
-    backgroundColor: colors.border3,
-  },
-  timelineDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.brand,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  timelineContent: {
-    flex: 1,
-    marginLeft: 12,
-    paddingBottom: 20,
-  },
-  timelineTitle: {
-    fontSize: 15,
-    fontFamily: fonts.semiBold,
-    color: colors.textBase,
-    marginBottom: 2,
-  },
-  timelineSubtitle: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-  },
-  historyEmpty: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    textAlign: "center",
-    paddingVertical: 24,
-  },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    backgroundColor: colors.bgWhite,
-  },
-  footerFixed: {
-    zIndex: 20,
-  },
-  addBtn: {
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: colors.brand,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addBtnText: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.textWhite,
-  },
-  emptyText: { fontSize: 16, color: colors.textSecondary },
-  backBtn: { marginTop: 16 },
-  backBtnText: { fontSize: 16, color: colors.brand },
-  sheetOverlay: { backgroundColor: "rgba(0,0,0,0.4)" },
-  sheet: {
-    backgroundColor: colors.bgWhite,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border3,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: 18,
-    color: colors.textBase,
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  sheetScroll: { maxHeight: 320 },
-  sheetLoading: { paddingVertical: 24, alignItems: "center" },
-  sheetEmpty: { paddingBottom: 8 },
-  sheetEmptyText: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  sheetRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-    gap: 12,
-  },
-  sheetRowCreate: { borderBottomWidth: 0 },
-  sheetRowText: {
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 16,
-    color: colors.textBase,
-  },
-  sheetRowSubtext: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
-  optionsSheet: {},
-  optionsSheetRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 4,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border1,
-  },
-  optionsSheetRowDanger: { borderBottomWidth: 0 },
-  optionsSheetRowText: {
-    fontFamily: fonts.medium,
-    fontSize: 16,
-    color: colors.textBase,
-  },
-  optionsSheetRowTextDanger: { color: colors.red },
+    container: { flex: 1, backgroundColor: colors.bgBase },
+    center: { justifyContent: "center", alignItems: "center" },
+    imageArea: {
+      width: "100%",
+      backgroundColor: colors.bgBaseElevated,
+    },
+    heroImage: {
+      width: "100%",
+      backgroundColor: colors.bgBaseElevated,
+    },
+    contentSheet: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      height: SCREEN_HEIGHT,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+    },
+    handleWrap: {
+      alignSelf: "center",
+    },
+    headerHandle: {
+      width: 40,
+      borderRadius: 3,
+      overflow: "hidden",
+    },
+    sheetHeaderRowWrap: {
+      overflow: "hidden",
+    },
+    sheetHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+    },
+    contentScrollWrap: { flex: 1, flexDirection: "column" },
+    contentScroll: { flex: 1 },
+    contentScrollContent: { paddingTop: 0 },
+    contentArea: {
+      paddingHorizontal: 16,
+      paddingTop: 4,
+    },
+    stickySectionRowStuck: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+    },
+    stickySectionRowScroll: {
+      flexGrow: 0,
+    },
+    stickySectionRowScrollContent: {
+      flexDirection: "row",
+      gap: 8,
+      paddingHorizontal: 0,
+    },
+    stickySectionRowScrollContentStuck: {
+      paddingHorizontal: 16,
+    },
+    stickySectionRowWrap: {
+      paddingVertical: 8,
+      // borderBottomWidth: 1,
+      // borderBottomColor: colors.border1,
+    },
+    sectionButtonsInFlow: {
+      marginBottom: 16,
+      marginHorizontal: -16,
+    },
+    sectionButtonsInFlowHidden: {
+      opacity: 0,
+    },
+    stickySectionBtn: {
+      minWidth: 88,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 10,
+      backgroundColor: colors.bgBaseElevated,
+    },
+    stickySectionBtnActive: {
+      backgroundColor: colors.isDark ? "#ffffff" : "#000000",
+    },
+    stickySectionBtnText: {
+      fontSize: 14,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
+    },
+    stickySectionBtnTextActive: {
+      color: colors.isDark ? "#000000" : "#ffffff",
+      fontFamily: fonts.semiBold,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+    },
+    headerCloseBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.bgWhite,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerMenuBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.bgWhite,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    scroll: { flex: 1 },
+    scrollContent: { padding: 0, paddingTop: 0 },
+    mainImage: {
+      width: "100%",
+      height: 320,
+      borderRadius: 16,
+      // backgroundColor: colors.border1,
+      marginBottom: 16,
+    },
+    placeholderImage: {},
+    titleBlock: { marginBottom: 16 },
+    name: {
+      fontSize: 22,
+      fontFamily: fonts.bold,
+      color: colors.textBase,
+      lineHeight: 28,
+    },
+    originLine: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    metricRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 8,
+      marginBottom: 16,
+    },
+    metricCard: {
+      backgroundColor: colors.bgWhite,
+      borderRadius: 16,
+      padding: 14,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    metricLabel: {
+      fontSize: 12,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      marginTop: 8,
+    },
+    metricValue: {
+      fontSize: 14,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+      marginTop: 2,
+    },
+    marketValueCard: {
+      backgroundColor: colors.brandLightElevated,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    marketValueHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 14,
+    },
+    marketValueTitleContainer: {
+      flex: 1,
+      marginLeft: 2,
+      flexDirection: "column",
+      gap: 2,
+    },
+    marketValueTitle: {
+      fontSize: 16,
+      fontFamily: fonts.medium,
+      color: colors.textBase,
+    },
+    marketValueDescription: {
+      fontSize: 14,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
+    },
+    marketValueLiveTag: {
+      backgroundColor: colors.brand,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 20,
+    },
+    marketValueLiveText: {
+      fontSize: 11,
+      fontFamily: fonts.semiBold,
+      color: colors.textWhite,
+      letterSpacing: 0.5,
+    },
+    marketValueCurrentBlock: {
+      backgroundColor: colors.bgWhiteA3,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      alignItems: "center",
+    },
+    marketValueCurrentLabel: {
+      fontSize: 16,
+      fontFamily: fonts.medium,
+      color: colors.textBase,
+      marginBottom: 6,
+    },
+    marketValueCurrentValue: {
+      fontSize: 30,
+      fontFamily: fonts.semiBold,
+      color: colors.brand,
+    },
+    marketValueLowHighRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    marketValueLowHighBlock: {
+      flex: 1,
+      backgroundColor: colors.bgWhiteA3,
+      borderRadius: 12,
+      padding: 14,
+      alignItems: "center",
+    },
+    marketValueLowHighLabel: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      marginBottom: 4,
+    },
+    marketValueLowHighValue: {
+      fontSize: 18,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+    },
+    ebayCard: {
+      backgroundColor: colors.bgWhite,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    ebayCardLoading: {
+      alignItems: "center",
+    },
+    ebayGridWrap: {
+      marginBottom: 20,
+    },
+    ebayGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      marginTop: 8,
+    },
+    ebayGridCard: {
+      backgroundColor: colors.bgWhite,
+      borderRadius: 12,
+      padding: 0,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    ebayGridCardImageWrap: {
+      width: "100%",
+      height: 140,
+      borderTopEndRadius: 12,
+      borderTopStartRadius: 12,
+      overflow: "hidden",
+      backgroundColor: colors.border1,
+    },
+    ebayGridCardImage: {
+      width: "100%",
+      height: "100%",
+    },
+    ebayGridCardImagePlaceholder: {
+      backgroundColor: colors.border2,
+    },
+    ebayGridCardTitle: {
+      fontSize: 16,
+      fontFamily: fonts.medium,
+      color: colors.textBase,
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      paddingTop: 12,
+    },
+    ebayGridCardBottom: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 12,
+      paddingHorizontal: 12,
+    },
+    ebayGridCardPrice: {
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: colors.brand,
+      flex: 1,
+    },
+    ebaySectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      // justifyContent: "space-between",
+      marginBottom: 12,
+    },
+    ebaySectionTitle: {
+      fontSize: 20,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+    },
+    ebayLiveBadge: {
+      backgroundColor: "#C62828",
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 6,
+      marginLeft: 12,
+    },
+    ebayLiveBadgeText: {
+      fontSize: 12,
+      fontFamily: fonts.semiBold,
+      color: "#fff",
+    },
+    ebayUnlockCard: {
+      borderRadius: 16,
+      padding: 24,
+      alignItems: "center",
+    },
+    ebayUnlockTitle: {
+      fontSize: 20,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    ebayUnlockSubtitle: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      marginBottom: 20,
+      marginHorizontal: 16,
+      textAlign: "center",
+    },
+    ebayUnlockBtnWrap: {
+      backgroundColor: colors.brand,
+      paddingVertical: 14,
+      paddingHorizontal: 24,
+      borderRadius: 12,
+      minWidth: 200,
+      alignItems: "center",
+    },
+    ebayUnlockBtnText: {
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: "#fff",
+    },
+    ebayCardSubtext: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      marginBottom: 14,
+    },
+    ebayPrimaryBtnContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    ebayList: { marginBottom: 12 },
+    ebayItemRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border1,
+    },
+    ebayItemImage: {
+      width: 48,
+      height: 48,
+      borderRadius: 8,
+      backgroundColor: colors.border1,
+    },
+    ebayItemImagePlaceholder: {},
+    ebayItemBody: { flex: 1, marginLeft: 12 },
+    ebayItemTitle: {
+      fontSize: 14,
+      fontFamily: fonts.medium,
+      color: colors.textBase,
+    },
+    ebayItemPrice: {
+      fontSize: 13,
+      fontFamily: fonts.semiBold,
+      color: colors.brand,
+      marginTop: 2,
+    },
+    ebayPrimaryBtn: {
+      backgroundColor: colors.brand,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    ebayPrimaryBtnText: {
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: colors.textWhite,
+    },
+    ebayLoadingText: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      marginTop: 8,
+    },
+    tabBar: {
+      position: "relative",
+      flexDirection: "row",
+      backgroundColor: colors.bgBaseElevated,
+      borderRadius: 12,
+      padding: 4,
+      marginBottom: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    tabIndicator: {
+      position: "absolute",
+      left: 4,
+      top: 4,
+      bottom: 4,
+      backgroundColor: colors.border1,
+      borderRadius: 10,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderRadius: 10,
+    },
+    tabActive: {
+      // background is the sliding indicator
+    },
+    tabText: {
+      fontSize: 14,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
+    },
+    tabTextActive: {
+      color: colors.textBase,
+    },
+    tabPanelWrap: {
+      marginBottom: 24,
+    },
+    tabPanel: {
+      backgroundColor: colors.bgWhite,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 0,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+      marginBottom: 8,
+    },
+    bodyText: {
+      fontSize: 15,
+      fontFamily: fonts.regular,
+      color: colors.textBase,
+      lineHeight: 22,
+      marginBottom: 16,
+    },
+    specList: {
+      marginTop: 4,
+    },
+    specRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border1,
+    },
+    specLabel: {
+      fontSize: 14,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
+      flex: 1,
+    },
+    specValue: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textBase,
+      marginLeft: 12,
+      textAlign: "right",
+    },
+    originCard: {
+      marginTop: 20,
+      // backgroundColor: colors.brandLight,
+      borderRadius: 12,
+      padding: 20,
+    },
+    originTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    originTitle: {
+      marginLeft: 8,
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+    },
+    originMetaRow: {
+      marginBottom: 12,
+    },
+    originMetaItem: {
+      marginBottom: 6,
+    },
+    originMetaLabel: {
+      fontSize: 13,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
+      marginBottom: 2,
+    },
+    originMetaValue: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textBase,
+    },
+    originText: {
+      fontSize: 15,
+      fontFamily: fonts.regular,
+      color: colors.textBase,
+      lineHeight: 22,
+    },
+    authenticityConfidenceRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16,
+    },
+    authenticityConfidenceBadge: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 10,
+    },
+    authenticityConfidence_high: { backgroundColor: "#dcfce7" },
+    authenticityConfidence_medium: { backgroundColor: "#fef9c3" },
+    authenticityConfidence_low: { backgroundColor: "#fee2e2" },
+    authenticityConfidenceText: {
+      fontSize: 14,
+      fontFamily: fonts.semiBold,
+    },
+    authenticityConfidenceText_high: { color: "#166534" },
+    authenticityConfidenceText_medium: { color: "#854d0e" },
+    authenticityConfidenceText_low: { color: "#b91c1c" },
+    authenticityRedFlags: {
+      marginTop: 12,
+      marginBottom: 16,
+    },
+    authenticityRedFlagsLabel: {
+      fontSize: 14,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+      marginBottom: 4,
+    },
+    authenticityRedFlagsText: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    authenticityDisclaimer: {
+      fontSize: 12,
+      fontFamily: fonts.regular,
+      color: colors.textTertiary,
+      fontStyle: "italic",
+      lineHeight: 18,
+    },
+    expertCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.bgWhite,
+    },
+    expertCardContent: {
+      flex: 1,
+      marginRight: 16,
+    },
+    expertCardTitle: {
+      fontSize: 18,
+      fontFamily: fonts.bold,
+      color: colors.textBase,
+      marginBottom: 6,
+    },
+    expertCardSubtitle: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    expertCardIllustration: {
+      width: 100,
+      height: 100,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    expertCardImage: {
+      width: 100,
+      height: 100,
+    },
+    metaRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border1,
+    },
+    metaLabel: {
+      fontSize: 14,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
+    },
+    metaValue: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textBase,
+    },
+    conditionGradeBlock: {
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    conditionGradeCircle: {
+      width: 72,
+      height: 72,
+      borderRadius: 50,
+      backgroundColor: colors.brandLight,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+    conditionGradeText: {
+      fontSize: 18,
+      fontFamily: fonts.bold,
+      color: colors.textBase,
+    },
+    conditionOverallTitle: {
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+      marginBottom: 4,
+    },
+    conditionOverallSubtitle: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      textAlign: "center",
+    },
+    conditionList: {},
+    conditionBadgeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 12,
+    },
+    conditionBadgeRowLabel: {
+      fontSize: 15,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+      flex: 1,
+    },
+    conditionBadgeBase: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      maxWidth: "55%",
+      backgroundColor: colors.border2,
+    },
+    conditionBadgeText: {
+      fontSize: 13,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
+    },
+    conditionBadgeLevel0: { backgroundColor: "#dcfce7" },
+    conditionBadgeTextLevel0: { color: "#166534" },
+    conditionBadgeLevel1: { backgroundColor: "#fef9c3" },
+    conditionBadgeTextLevel1: { color: "#854d0e" },
+    conditionBadgeLevel2: { backgroundColor: "#ffedd5" },
+    conditionBadgeTextLevel2: { color: "#c2410c" },
+    conditionBadgeLevel3: { backgroundColor: "#fee2e2" },
+    conditionBadgeTextLevel3: { color: "#b91c1c" },
+    conditionBadgeLevel4: { backgroundColor: "#fecaca" },
+    conditionBadgeTextLevel4: { color: "#7f1d1d" },
+    conditionRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      marginBottom: 16,
+    },
+    conditionRowIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: colors.greenLight,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    conditionRowIconBad: {
+      backgroundColor: colors.redLight,
+    },
+    conditionRowIconNeutral: {
+      backgroundColor: colors.brandLight,
+    },
+    conditionRowBody: { flex: 1 },
+    conditionRowHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 4,
+    },
+    conditionRowLabel: {
+      fontSize: 15,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+    },
+    conditionRowStatusBadge: {
+      backgroundColor: colors.brandLight,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
+    conditionRowStatusBadgeBad: {
+      backgroundColor: colors.redLight,
+    },
+    conditionRowStatusBadgeNeutral: {
+      backgroundColor: colors.brandLight,
+    },
+    conditionRowStatusText: {
+      fontSize: 13,
+      fontFamily: fonts.medium,
+      color: colors.textBase,
+    },
+    conditionRowStatusTextBad: {
+      color: colors.red,
+    },
+    conditionRowStatusTextNeutral: {
+      color: colors.brand,
+    },
+    conditionRowNote: {
+      fontSize: 13,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      lineHeight: 18,
+    },
+    acquisitionRows: {
+      marginTop: 4,
+    },
+    timeline: {
+      marginTop: 12,
+    },
+    timelineItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+    },
+    timelineLeft: {
+      width: 32,
+      alignItems: "center",
+    },
+    timelineLine: {
+      width: 2,
+      height: 16,
+      backgroundColor: colors.border3,
+    },
+    timelineDot: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.brand,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    timelineContent: {
+      flex: 1,
+      marginLeft: 12,
+      paddingBottom: 20,
+    },
+    timelineTitle: {
+      fontSize: 15,
+      fontFamily: fonts.semiBold,
+      color: colors.textBase,
+      marginBottom: 2,
+    },
+    timelineSubtitle: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+    },
+    historyEmpty: {
+      fontSize: 15,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      textAlign: "center",
+      paddingVertical: 24,
+    },
+    footer: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      backgroundColor: colors.bgWhite,
+      borderTopWidth: 1.5,
+      borderTopColor: colors.border1,
+    },
+    footerFixed: {
+      zIndex: 20,
+    },
+    addBtn: {
+      height: 52,
+      borderRadius: 12,
+      backgroundColor: colors.brand,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    addBtnText: {
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: colors.textWhite,
+    },
+    emptyText: { fontSize: 16, color: colors.textSecondary },
+    backBtn: { marginTop: 16 },
+    backBtnText: { fontSize: 16, color: colors.brand },
+    sheetOverlay: { backgroundColor: "rgba(0,0,0,0.4)" },
+    sheet: {
+      backgroundColor: colors.bgWhite,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 24,
+      paddingTop: 12,
+    },
+    sheetHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border3,
+      alignSelf: "center",
+      marginBottom: 20,
+    },
+    sheetTitle: {
+      fontFamily: fonts.semiBold,
+      fontSize: 18,
+      color: colors.textBase,
+      marginBottom: 16,
+      textAlign: "center",
+    },
+    sheetScroll: { maxHeight: 320 },
+    sheetLoading: { paddingVertical: 24, alignItems: "center" },
+    sheetEmpty: { paddingBottom: 8 },
+    sheetEmptyText: {
+      fontFamily: fonts.regular,
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: 12,
+    },
+    sheetRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 14,
+      paddingHorizontal: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border1,
+      gap: 12,
+    },
+    sheetRowCreate: { borderBottomWidth: 0 },
+    sheetRowText: {
+      flex: 1,
+      fontFamily: fonts.medium,
+      fontSize: 16,
+      color: colors.textBase,
+    },
+    sheetRowSubtext: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      color: colors.textTertiary,
+    },
+    optionsSheet: {},
+    optionsSheetRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 16,
+      paddingHorizontal: 4,
+      gap: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border1,
+    },
+    optionsSheetRowDanger: { borderBottomWidth: 0 },
+    optionsSheetRowText: {
+      fontFamily: fonts.medium,
+      fontSize: 16,
+      color: colors.textBase,
+    },
+    optionsSheetRowTextDanger: { color: colors.red },
   });
 }

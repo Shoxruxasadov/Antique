@@ -35,6 +35,7 @@ import { useAppSettingsStore } from '../../stores/useAppSettingsStore';
 import { useExchangeRatesStore } from '../../stores/useExchangeRatesStore';
 import { t } from '../../lib/i18n';
 import { formatPriceUsd, getDisplayMarketValueUsd } from '../../lib/currency';
+import { normalizeCategoryDisplay } from '../../lib/antiqueDisplay';
 
 export default function CollectionDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -545,9 +546,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
             <View style={styles.listExtendedWrap}>
               {items.map((item) => {
                 const imageUrl = Array.isArray(item.image_url)?.[0] || item.image_url;
-                const category = Array.isArray(item.category)
-                  ? item.category.join(', ')
-                  : (item.category || 'Antique');
+                const category = normalizeCategoryDisplay(item.name, item.specification?.category ?? item.category);
                 const itemCurrent = getDisplayMarketValueUsd(item);
                 const priceStr = itemCurrent > 0 ? formatPriceUsd(itemCurrent, displayCurrency, rate) : '';
                 return (
@@ -602,9 +601,7 @@ export default function CollectionDetailScreen({ route, navigation }) {
           ) : (
             items.map((item) => {
               const imageUrl = Array.isArray(item.image_url)?.[0] || item.image_url;
-              const category = Array.isArray(item.category)
-                ? item.category.join(', ')
-                : (item.category || 'Antique');
+              const category = normalizeCategoryDisplay(item.name, item.specification?.category ?? item.category);
               const itemCurrent = getDisplayMarketValueUsd(item);
               const priceStr = itemCurrent > 0 ? formatPriceUsd(itemCurrent, displayCurrency, rate) : '';
               return (

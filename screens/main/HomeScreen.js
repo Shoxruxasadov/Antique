@@ -29,6 +29,7 @@ import { useAuthStore } from "../../stores/useAuthStore";
 import { useExchangeRatesStore } from "../../stores/useExchangeRatesStore";
 import { useLocalCollectionStore } from "../../stores/useLocalCollectionStore";
 import { formatPriceUsd, getDisplayMarketValueUsd } from "../../lib/currency";
+import { normalizeCategoryDisplay } from "../../lib/antiqueDisplay";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { fetchLatestBlogs } from "../../lib/blogApi";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
@@ -573,7 +574,21 @@ export default function HomeScreen({ navigation }) {
             .eq("user_id", user.id)
             .order("created_at", { ascending: false })
             .limit(20);
-          const serverSnaps = (data ?? []).map((r) => ({ ...r, antique: undefined }));
+          const rawSnaps = data ?? [];
+          const antiqueIds = [...new Set(rawSnaps.map((s) => s.antique_id).filter(Boolean))];
+          let serverSnaps = rawSnaps.map((r) => ({ ...r, antique: undefined }));
+          if (antiqueIds.length > 0) {
+            const { data: antiques } = await supabase
+              .from("antiques")
+              .select("id, name, category, market_value_min, market_value_max, image_url, specification")
+              .in("id", antiqueIds);
+            const byId = {};
+            (antiques || []).forEach((row) => { byId[row.id] = row; });
+            serverSnaps = rawSnaps.map((r) => ({
+              ...r,
+              antique: r.antique_id ? byId[r.antique_id] ?? null : null,
+            }));
+          }
           const merged = [...serverSnaps, ...localSnaps].sort((a, b) => {
             const ca = a.created_at ?? "";
             const cb = b.created_at ?? "";
@@ -711,10 +726,11 @@ export default function HomeScreen({ navigation }) {
             style={styles.snapRowScroll}
           >
             {lastSnaps.map((snap) => {
-                const category = Array.isArray(snap.payload?.category)
-                  ? snap.payload.category.join(", ")
-                  : snap.payload?.category || "Antique";
-                const displayValueObj = {
+                const antique = snap.antique;
+                const category = antique
+                  ? normalizeCategoryDisplay(antique.name, antique.specification?.category ?? antique.category ?? snap.payload?.category)
+                  : normalizeCategoryDisplay(snap.payload?.name, snap.payload?.category || "Antique");
+                const valueSource = antique ?? {
                   market_value_min: snap.payload?.market_value_min,
                   market_value_max: snap.payload?.market_value_max,
                   specification: {
@@ -722,7 +738,7 @@ export default function HomeScreen({ navigation }) {
                     ebay_items: snap.antique?.specification?.ebay_items,
                   },
                 };
-                const currentValue = getDisplayMarketValueUsd(displayValueObj);
+                const currentValue = getDisplayMarketValueUsd(valueSource);
                 const priceStr =
                   currentValue > 0
                     ? formatPriceUsd(currentValue, displayCurrency, rate)

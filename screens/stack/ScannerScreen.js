@@ -10,6 +10,7 @@ import {
   Modal,
   Text,
   Animated,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
@@ -437,17 +438,26 @@ export default function ScannerScreen({ navigation }) {
 
         const snapDisplayImageUrl = scanImageUrl;
         const displayImageUrl = scanImageUrl || scanImageUri || null;
+        // antiques.image_url NOT NULL — fallback to local URI or empty string so insert never fails
+        const antiqueImageUrl = scanImageUrl || displayImageUrl || scanImageUri || "";
 
         const antiqueRow = {
           user_id: userId,
           name: geminiResult.name || "Unknown Antique",
           description: geminiResult.description || "",
-          image_url: userId ? (scanImageUrl || null) : displayImageUrl,
+          image_url: antiqueImageUrl,
           origin_country: geminiResult.origin_country || "Unknown",
           period_start_year: Number(geminiResult.period_start_year) || 1800,
           period_end_year: Number(geminiResult.period_end_year) || 1900,
           estimated_age_years: Number(geminiResult.estimated_age_years) || 50,
-          rarity_score: 7,
+          rarity_score: (() => {
+            const num = Number(geminiResult.rarity_score ?? geminiResult.specification?.rarity_score);
+            if (Number.isFinite(num) && num >= 1 && num <= 10) return Math.round(num);
+            const label = (geminiResult.rarity_label ?? geminiResult.specification?.rarity_label ?? "").trim();
+            const fromLabel = { Common: 2, Uncommon: 4, Rare: 5, "Very Rare": 7, "Extremely Rare": 9 }[label];
+            if (fromLabel != null) return fromLabel;
+            return 0;
+          })(),
           rarity_max_score: 10,
           overall_condition_summary:
             geminiResult.overall_condition_summary || "Good",
@@ -471,9 +481,32 @@ export default function ScannerScreen({ navigation }) {
           crystal_condition_notes: geminiResult.crystal_condition_notes || "",
           category: Array.isArray(geminiResult.category)
             ? geminiResult.category
-            : ["Antique"],
+            : geminiResult.category != null && geminiResult.category !== ""
+              ? [String(geminiResult.category)]
+              : ["Antique"],
           specification: {
             ...(geminiResult.specification ?? {}),
+            ...(geminiResult.period != null ? { period: String(geminiResult.period) } : {}),
+            ...(geminiResult.origin != null ? { origin: String(geminiResult.origin) } : {}),
+            ...(geminiResult.maker != null ? { maker: String(geminiResult.maker) } : {}),
+            ...(geminiResult.material != null ? { material: String(geminiResult.material) } : {}),
+            ...(geminiResult.dimensions != null ? { dimensions: String(geminiResult.dimensions) } : {}),
+            ...(geminiResult.estimated_age_display != null ? { estimated_age_display: String(geminiResult.estimated_age_display) } : {}),
+            ...(geminiResult.rarity_label != null ? { rarity_label: String(geminiResult.rarity_label) } : {}),
+            ...(geminiResult.market_demand != null ? { market_demand: String(geminiResult.market_demand) } : {}),
+            ...(geminiResult.region_of_origin != null ? { region_of_origin: String(geminiResult.region_of_origin) } : {}),
+            ...(geminiResult.typical_use != null ? { typical_use: String(geminiResult.typical_use) } : {}),
+            ...(geminiResult.category != null ? { category: String(geminiResult.category) } : {}),
+            ...(geminiResult.surface_condition != null ? { surface_condition: String(geminiResult.surface_condition) } : {}),
+            ...(geminiResult.structural_integrity != null ? { structural_integrity: String(geminiResult.structural_integrity) } : {}),
+            ...(geminiResult.age_wear != null ? { age_wear: String(geminiResult.age_wear) } : {}),
+            ...(geminiResult.authenticity_markers != null ? { authenticity_markers: String(geminiResult.authenticity_markers) } : {}),
+            ...(geminiResult.authenticity_confidence_level != null ? { authenticity_confidence_level: String(geminiResult.authenticity_confidence_level) } : {}),
+            ...(geminiResult.authenticity_material_match != null ? { authenticity_material_match: Boolean(geminiResult.authenticity_material_match) } : {}),
+            ...(geminiResult.authenticity_style_match != null ? { authenticity_style_match: Boolean(geminiResult.authenticity_style_match) } : {}),
+            ...(geminiResult.authenticity_wear_pattern != null ? { authenticity_wear_pattern: Boolean(geminiResult.authenticity_wear_pattern) } : {}),
+            ...(geminiResult.authenticity_known_red_flags != null ? { authenticity_known_red_flags: String(geminiResult.authenticity_known_red_flags) } : {}),
+            ...(geminiResult.care_tips != null ? { care_tips: String(geminiResult.care_tips) } : {}),
             ...(geminiResult.estimated_market_value_usd != null
               ? { estimated_market_value_usd: Number(geminiResult.estimated_market_value_usd) }
               : {}),
@@ -543,10 +576,10 @@ export default function ScannerScreen({ navigation }) {
           return;
         }
 
-        const { data: antique, error: antErr } = await supabase
+        const { data: insertedAntique, error: antErr } = await supabase
           .from("antiques")
           .insert(antiqueRow)
-          .select("id")
+          .select("*")
           .single();
         if (antErr) throw antErr;
         if (cancelled) return;
@@ -566,8 +599,8 @@ export default function ScannerScreen({ navigation }) {
         };
         const { error: snapErr } = await supabase.from("snap_history").insert({
           user_id: userId,
-          image_url: snapDisplayImageUrl,
-          antique_id: antique.id,
+          image_url: antiqueImageUrl,
+          antique_id: insertedAntique.id,
           payload,
         });
         if (snapErr) throw snapErr;
@@ -586,12 +619,16 @@ export default function ScannerScreen({ navigation }) {
             { name: "MainTabs" },
             {
               name: "ItemDetails",
-              params: { antiqueId: antique.id, fromScan: true },
+              params: { antique: insertedAntique, fromScan: true },
             },
           ],
         });
       } catch (e) {
-        if (!cancelled) setScanError(e?.message || "Analysis failed");
+        if (!cancelled) {
+          const msg = e?.message || "";
+          const isConnectionError = /connection error|check your internet|network request failed|failed to fetch|load failed|timeout/i.test(msg);
+          setScanError(isConnectionError ? t("scanner.connectionError") : (msg || "Analysis failed"));
+        }
       }
     })();
 
@@ -744,7 +781,7 @@ export default function ScannerScreen({ navigation }) {
       </View>
 
       {!isPro && (
-        <View style={[styles.scansBarContainer, { bottom: insets.bottom + 150 }]}>
+        <View style={[styles.scansBarContainer, { bottom: insets.bottom + 180 }]}>
           <Text style={styles.scansBarText}>
             {t("scanner.scanLeft")}: {remainingScans}
           </Text>
@@ -766,10 +803,10 @@ export default function ScannerScreen({ navigation }) {
         <Pressable
           style={styles.galleryButton}
           onPress={async () => {
-            if (!isPro && remainingScans === 0) {
-              navigation.navigate("Pro", { fromScanner: true });
-              return;
-            }
+            // if (!isPro && remainingScans === 0) {
+            //   navigation.navigate("Pro", { fromScanner: true });
+            //   return;
+            // }
             try {
               const { status } =
                 await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -876,9 +913,8 @@ export default function ScannerScreen({ navigation }) {
                   {t('scanner.scanning')}{'.'.repeat(scanningDots)}
                 </Text>
                 <View style={styles.scanStepsWrap}>
-                  {CHECKLIST_STEPS.filter((_, index) => (index === 0 ? completedSteps >= 1 : index <= completedSteps)).map((label, index) => {
-                    const done = completedSteps >= index + 1;
-                    const current = completedSteps === index;
+                  {CHECKLIST_STEPS.filter((_, index) => index <= completedSteps).map((label, index) => {
+                    const done = completedSteps > index;
                     const translateY =
                       index === 0
                         ? step1TranslateY
@@ -906,7 +942,9 @@ export default function ScannerScreen({ navigation }) {
                             <Animated.View style={{ transform: [{ scale: checkScale }] }}>
                               <Check size={18} color="#fff" />
                             </Animated.View>
-                          ) : null}
+                          ) : (
+                            <ActivityIndicator size="small" color="#fff" />
+                          )}
                         </View>
                         <Text style={styles.stepText}>{t(label)}</Text>
                       </Animated.View>

@@ -37,6 +37,9 @@ export default function MainTabs() {
         tabBarContentContainerStyle: styles.tabBarContentContainer,
         tabBarBackground: () => <TabBarBackground />,
         tabBarShowLabel: true,
+        screenListeners: {
+          tabPress: () => triggerHaptic(vibration),
+        },
       }}
     >
       <Tab.Screen
@@ -47,11 +50,8 @@ export default function MainTabs() {
             <SquaresFour size={TAB_ICON_SIZE} color={color} weight='fill'  />
           ),
           tabBarLabel: t('tabs.home'),
-          listeners: ({ navigation }) => ({
-            tabPress: () => {
-              triggerHaptic(vibration);
-              setHomeAnimateOnNextFocus(true);
-            },
+          listeners: () => ({
+            tabPress: () => setHomeAnimateOnNextFocus(true),
           }),
         }}
       />
@@ -63,9 +63,6 @@ export default function MainTabs() {
             <FolderSimpleIcon size={TAB_ICON_SIZE} color={color} weight='fill'  />
           ),
           tabBarLabel: t('tabs.collections'),
-          listeners: () => ({
-            tabPress: () => triggerHaptic(vibration),
-          }),
         }}
       />
       <Tab.Screen
@@ -93,9 +90,6 @@ export default function MainTabs() {
             <User size={TAB_ICON_SIZE} color={color} weight='fill' />
           ),
           tabBarLabel: t('tabs.profile'),
-          listeners: () => ({
-            tabPress: () => triggerHaptic(vibration),
-          }),
         }}
       />
     </Tab.Navigator>
