@@ -48,10 +48,6 @@
     "android": {
       "icon": "./assets/radial_logo.png",
       "edgeToEdgeEnabled": true,
-      "statusBar": {
-        "translucent": true,
-        "backgroundColor": "#00000000"
-      },
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
