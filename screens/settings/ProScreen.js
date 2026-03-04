@@ -18,7 +18,7 @@ import { X, Check } from 'phosphor-react-native';
 import { openTermsOfUse, openPrivacyPolicy } from '../../lib/legalLinks';
 import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
 import { fonts } from '../../theme';
-import { getPackageToPurchase, purchasePackage, restorePurchases } from '../../lib/revenueCat';
+import { getPackageToPurchase, getOfferingsDebug, purchasePackage, restorePurchases } from '../../lib/revenueCat';
 import { t } from '../../lib/i18n';
 
 const COUNTDOWN_MS = 3000;
@@ -211,7 +211,12 @@ export default function ProScreen({ navigation }) {
             try {
               const pkg = await getPackageToPurchase(plan);
               if (!pkg) {
-                Alert.alert(t('common.error'), t('pro.noPackageAvailable'), [{ text: t('common.ok') }]);
+                if (__DEV__) getOfferingsDebug();
+                Alert.alert(
+                  t('common.error'),
+                  t('pro.noPackageAvailable'),
+                  [{ text: t('common.ok') }],
+                );
                 return;
               }
               await purchasePackage(pkg);

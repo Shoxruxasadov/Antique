@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   StyleSheet,
   View,
@@ -403,6 +404,13 @@ export default function AntiqueScreen({ route, navigation }) {
   useEffect(() => {
     refreshCollectionStatus();
   }, [refreshCollectionStatus]);
+
+  // Pro holatini ekran fokusda yangilash (eBay va boshqa Pro-cheklovlar uchun)
+  useFocusEffect(
+    useCallback(() => {
+      checkIsPro().then(setIsPro);
+    }, []),
+  );
 
   // eBay: agar specification da ebay ma’lumoti yo‘q bo‘lsa, antique nomi bo‘yicha qidiruv
   useEffect(() => {

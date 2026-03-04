@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.webnum.antique",
       "usesAppleSignIn": true,
-      "buildNumber": "22",
+      "buildNumber": "24",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDevelopmentRegion": "en",
@@ -71,7 +71,7 @@
         "android.permission.READ_MEDIA_AUDIO"
       ],
       "package": "com.webnum.antique",
-      "versionCode": 22
+      "versionCode": 24
     },
     "web": {
       "favicon": "./assets/logo.png"

@@ -31,6 +31,7 @@ import { useLocalCollectionStore } from "../../stores/useLocalCollectionStore";
 import { formatPriceUsd, getDisplayMarketValueUsd } from "../../lib/currency";
 import { normalizeCategoryDisplay } from "../../lib/antiqueDisplay";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
+import { checkIsPro } from "../../lib/revenueCat";
 import { fetchLatestBlogs } from "../../lib/blogApi";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 import { t } from "../../lib/i18n";
@@ -94,12 +95,19 @@ export default function HomeScreen({ navigation }) {
   const [showHistoryOptionsSheet, setShowHistoryOptionsSheet] = useState(false);
   const [selectedSnap, setSelectedSnap] = useState(null);
   const [proBtnLayout, setProBtnLayout] = useState({ width: 0, height: 0 });
+  const [isPro, setIsPro] = useState(false);
   const cardAnims = useRef(createCardAnims()).current;
   const mainStack = navigation.getParent();
   const sheetOverlayOpacity = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(
     new Animated.Value(Dimensions.get("window").height),
   ).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      checkIsPro().then(setIsPro);
+    }, []),
+  );
 
   const easeOut = Easing.bezier(0.25, 0.1, 0.25, 1);
 
@@ -637,50 +645,52 @@ export default function HomeScreen({ navigation }) {
               </View>
               <Text style={styles.currencyLabel}>{t("home.preferredCurrency")}</Text>
             </Pressable>
-            <Pressable
-              style={styles.proBtn}
-              onPress={() => mainStack?.navigate("Pro")}
-              onLayout={(e) => {
-                const { width, height } = e.nativeEvent.layout;
-                setProBtnLayout((prev) =>
-                  prev.width === width && prev.height === height
-                    ? prev
-                    : { width, height },
-                );
-              }}
-            >
-              {proBtnLayout.width > 0 && proBtnLayout.height > 0 && (
-                <Svg
-                  style={StyleSheet.absoluteFill}
-                  width={proBtnLayout.width}
-                  height={proBtnLayout.height}
-                >
-                  <Defs>
-                    <LinearGradient id="proBtnGrad" x1="0" y1="0" x2="1" y2="0">
-                      <Stop offset="0" stopColor="#FFB900" />
-                      <Stop offset="1" stopColor="#F7880B" />
-                    </LinearGradient>
-                  </Defs>
-                  <Rect
-                    x={0}
-                    y={0}
+            {!isPro && (
+              <Pressable
+                style={styles.proBtn}
+                onPress={() => mainStack?.navigate("Pro")}
+                onLayout={(e) => {
+                  const { width, height } = e.nativeEvent.layout;
+                  setProBtnLayout((prev) =>
+                    prev.width === width && prev.height === height
+                      ? prev
+                      : { width, height },
+                  );
+                }}
+              >
+                {proBtnLayout.width > 0 && proBtnLayout.height > 0 && (
+                  <Svg
+                    style={StyleSheet.absoluteFill}
                     width={proBtnLayout.width}
                     height={proBtnLayout.height}
-                    rx={20}
-                    ry={20}
-                    fill="url(#proBtnGrad)"
+                  >
+                    <Defs>
+                      <LinearGradient id="proBtnGrad" x1="0" y1="0" x2="1" y2="0">
+                        <Stop offset="0" stopColor="#FFB900" />
+                        <Stop offset="1" stopColor="#F7880B" />
+                      </LinearGradient>
+                    </Defs>
+                    <Rect
+                      x={0}
+                      y={0}
+                      width={proBtnLayout.width}
+                      height={proBtnLayout.height}
+                      rx={20}
+                      ry={20}
+                      fill="url(#proBtnGrad)"
+                    />
+                  </Svg>
+                )}
+                <View style={styles.proBtnContent}>
+                  <CrownSimpleIcon
+                    size={20}
+                    color={colors.textWhite}
+                    weight="fill"
                   />
-                </Svg>
-              )}
-              <View style={styles.proBtnContent}>
-                <CrownSimpleIcon
-                  size={20}
-                  color={colors.textWhite}
-                  weight="fill"
-                />
-                <Text style={styles.proBtnText}>{t("home.pro")}</Text>
-              </View>
-            </Pressable>
+                  <Text style={styles.proBtnText}>{t("home.pro")}</Text>
+                </View>
+              </Pressable>
+            )}
           </View>
         </Animated.View>
 
