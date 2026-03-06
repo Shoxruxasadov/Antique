@@ -2,7 +2,7 @@
   "expo": {
     "name": "AntiqPro",
     "slug": "Antique",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "orientation": "portrait",
     "scheme": "com.webnum.antique",
     "icon": "./assets/logo.png",
@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.webnum.antique",
       "usesAppleSignIn": true,
-      "buildNumber": "24",
+      "buildNumber": "25",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDevelopmentRegion": "en",
@@ -67,7 +67,7 @@
         "android.permission.READ_MEDIA_AUDIO"
       ],
       "package": "com.webnum.antique",
-      "versionCode": 24
+      "versionCode": 25
     },
     "web": {
       "favicon": "./assets/logo.png"

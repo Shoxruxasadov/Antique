@@ -212,11 +212,6 @@ export default function ProScreen({ navigation }) {
               const pkg = await getPackageToPurchase(plan);
               if (!pkg) {
                 if (__DEV__) getOfferingsDebug();
-                Alert.alert(
-                  t('common.error'),
-                  t('pro.noPackageAvailable'),
-                  [{ text: t('common.ok') }],
-                );
                 return;
               }
               await purchasePackage(pkg);
